@@ -197,11 +197,12 @@ export default function InteractionClient() {
               args: [BigInt(i)]
             }) as [string, bigint, string] // [addr, tokens, name]
 
+            const tokensAllocated = Number(judgeInfo[1])
             judges.push({
               address: judgeInfo[0],
               name: judgeInfo[2],
-              tokensAllocated: Number(judgeInfo[1]),
-              tokensRemaining: Number(judgeInfo[1])
+              tokensAllocated,
+              tokensRemaining: tokensAllocated // Will be calculated below
             })
           } catch (judgeError) {
             console.error(`Error fetching judge ${i}:`, judgeError)
@@ -257,6 +258,31 @@ export default function InteractionClient() {
           } catch (projectError) {
             console.error(`Error fetching project ${i}:`, projectError)
           }
+        }
+      }
+
+      // Calculate remaining tokens for each judge by checking their votes across all projects
+      if (judges.length > 0 && Number(projectCount) > 0) {
+        for (const judge of judges) {
+          let tokensUsed = 0
+          
+          // Sum up all votes this judge has cast across all projects
+          for (let projectId = 0; projectId < Number(projectCount); projectId++) {
+            try {
+              const voteAmount = await publicClient.readContract({
+                address: contractAddress,
+                abi: HACKHUB_ABI,
+                functionName: 'judgeVotes',
+                args: [judge.address as `0x${string}`, BigInt(projectId)]
+              }) as bigint
+              
+              tokensUsed += Number(voteAmount)
+            } catch (err) {
+              console.error(`Error fetching votes for judge ${judge.address} on project ${projectId}:`, err)
+            }
+          }
+          
+          judge.tokensRemaining = judge.tokensAllocated - tokensUsed
         }
       }
 
@@ -339,7 +365,7 @@ export default function InteractionClient() {
       // Refresh data after submission
       setTimeout(() => {
         fetchHackathonData()
-      }, 2000)
+      }, 1000)
       
     } catch (err: any) {
       console.error('Error submitting project:', err)
