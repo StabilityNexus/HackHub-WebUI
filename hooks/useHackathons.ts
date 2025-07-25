@@ -41,6 +41,8 @@ export interface HackathonData {
   projects: Project[]
   projectCount: number
   judgeCount: number
+  isERC20Prize?: boolean // Whether prize is ERC20 token
+  prizeTokenSymbol?: string // Token symbol (e.g., "USDC", "DAI")
 }
 
 // Utility functions

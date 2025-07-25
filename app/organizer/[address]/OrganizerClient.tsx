@@ -95,19 +95,12 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
         return
       }
 
-      // Get all hackathon addresses
-      const [ongoingCount, pastCount] = await Promise.all([
-        publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getOngoingCount',
-        }) as Promise<bigint>,
-        publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getPastCount',
-        }) as Promise<bigint>,
-      ])
+      // Get all hackathon addresses using the optimized getCounts function
+      const [ongoingCount, pastCount] = await publicClient.readContract({
+        address: factoryAddress,
+        abi: HACKHUB_FACTORY_ABI,
+        functionName: 'getCounts',
+      }) as [bigint, bigint]
 
       let allAddresses: `0x${string}`[] = []
       
@@ -115,8 +108,8 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
         const ongoingAddrs = await publicClient.readContract({
           address: factoryAddress,
           abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getOngoingHackathons',
-          args: [BigInt(0), BigInt(Number(ongoingCount) - 1)],
+          functionName: 'getHackathons',
+          args: [BigInt(0), BigInt(Number(ongoingCount) - 1), true],
         }) as `0x${string}`[]
         allAddresses = allAddresses.concat(ongoingAddrs)
       }
@@ -125,8 +118,8 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
         const pastAddrs = await publicClient.readContract({
           address: factoryAddress,
           abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getPastHackathons',
-          args: [BigInt(0), BigInt(Number(pastCount) - 1)],
+          functionName: 'getHackathons',
+          args: [BigInt(0), BigInt(Number(pastCount) - 1), false],
         }) as `0x${string}`[]
         allAddresses = allAddresses.concat(pastAddrs)
       }

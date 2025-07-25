@@ -14,9 +14,21 @@ import { HACKHUB_FACTORY_ABI } from "@/utils/contractABI/HackHubFactory"
 import { HACKHUB_ABI } from "@/utils/contractABI/HackHub"
 import { formatEther } from "viem"
 import { Trophy, Target, Calendar, Users, Vote, Gavel, Code, Coins, CheckCircle, XCircle, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff } from "lucide-react"
-import { useChainId, useAccount } from "wagmi"
+import { useChainId, useAccount, useWriteContract } from "wagmi"
 import Link from "next/link"
 import { formatUTCTimestamp } from '@/utils/timeUtils'
+import { toast } from "sonner"
+
+// ERC20 ABI for token symbol
+const ERC20_ABI = [
+  {
+    "inputs": [],
+    "name": "symbol",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const
 
 type TabType = "participating" | "judging" | "organizing"
 
@@ -33,6 +45,52 @@ export default function MyHackathonsPage() {
   
   const chainId = useChainId()
   const { address: userAddress, isConnected } = useAccount()
+  const { writeContract } = useWriteContract()
+  
+  // Claim state
+  const [claimingPrizes, setClaimingPrizes] = useState<{[key: string]: boolean}>({})
+
+  // Helper function to format prize amounts
+  const formatPrizeAmount = (hackathon: HackathonData) => {
+    if (hackathon.isERC20Prize && hackathon.prizeTokenSymbol) {
+      return `${hackathon.prizePool} ${hackathon.prizeTokenSymbol}`
+    }
+    return `${hackathon.prizePool} ETH`
+  }
+
+  // Handle claim prize
+  const handleClaimPrize = async (hackathonAddress: string, projectId: number) => {
+    if (!userAddress || !isConnected) {
+      toast.error("Please connect your wallet to claim prize")
+      return
+    }
+
+    const key = `${hackathonAddress}-${projectId}`
+    
+    try {
+      setClaimingPrizes(prev => ({ ...prev, [key]: true }))
+      
+      await writeContract({
+        address: hackathonAddress as `0x${string}`,
+        abi: HACKHUB_ABI,
+        functionName: 'claimPrize',
+        args: [BigInt(projectId)],
+      })
+
+      toast.success("Prize claimed successfully!")
+      
+      // Refresh data after a delay
+      setTimeout(() => {
+        loadUserHackathons()
+      }, 2000)
+      
+    } catch (err: any) {
+      console.error('Error claiming prize:', err)
+      toast.error(err?.message || "Failed to claim prize")
+    } finally {
+      setClaimingPrizes(prev => ({ ...prev, [key]: false }))
+    }
+  }
 
   // Network info
   const getNetworkName = (chainId: number) => {
@@ -64,6 +122,8 @@ export default function MyHackathonsPage() {
         factory,
         judgeCount,
         projectCount,
+        isERC20Prize,
+        prizeToken,
       ] = await Promise.all([
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'name' }) as Promise<string>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startDate' }) as Promise<string>,
@@ -77,29 +137,73 @@ export default function MyHackathonsPage() {
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'factory' }) as Promise<string>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'judgeCount' }) as Promise<bigint>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'projectCount' }) as Promise<bigint>,
+        publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'isERC20Prize' }) as Promise<boolean>,
+        publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'prizeToken' }) as Promise<string>,
       ])
+
+      // Get token symbol if it's an ERC20 prize
+      let tokenSymbol = "ETH"
+      if (isERC20Prize && prizeToken !== "0x0000000000000000000000000000000000000000") {
+        try {
+          tokenSymbol = await publicClient.readContract({
+            address: prizeToken as `0x${string}`,
+            abi: ERC20_ABI,
+            functionName: 'symbol',
+          }) as string
+        } catch (err) {
+          console.error('Error fetching token symbol:', err)
+          tokenSymbol = "TOKEN"
+        }
+      }
 
       // Fetch judges if user is a judge
       const judges = []
       if (Number(judgeCount) > 0) {
-        for (let i = 0; i < Number(judgeCount); i++) {
-          try {
-            const judgeInfo = await publicClient.readContract({ 
+        try {
+          const [judgeAddresses, judgeNames] = await Promise.all([
+            publicClient.readContract({ 
               address: addr, 
               abi: HACKHUB_ABI, 
-              functionName: 'judges',
-              args: [BigInt(i)]
-            }) as [string, bigint, string] // [addr, tokens, name]
+              functionName: 'getJudges',
+              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+            }) as Promise<string[]>,
+            publicClient.readContract({ 
+              address: addr, 
+              abi: HACKHUB_ABI, 
+              functionName: 'getJudgeNames',
+              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+            }) as Promise<string[]>
+          ])
 
-            judges.push({
-              address: judgeInfo[0],
-              name: judgeInfo[2],
-              tokensAllocated: Number(judgeInfo[1]),
-              tokensRemaining: Number(judgeInfo[1])
-            })
-          } catch (judgeError) {
-            console.error(`Error fetching judge ${i}:`, judgeError)
+          for (let i = 0; i < judgeAddresses.length; i++) {
+            try {
+              // Get judge tokens allocated
+              const judgeTokens = await publicClient.readContract({
+                address: addr,
+                abi: HACKHUB_ABI,
+                functionName: 'judgeTokens',
+                args: [judgeAddresses[i] as `0x${string}`]
+              }) as bigint
+
+              const remainingTokens = await publicClient.readContract({
+                address: addr,
+                abi: HACKHUB_ABI,
+                functionName: 'remainingJudgeTokens',
+                args: [judgeAddresses[i] as `0x${string}`]
+              }) as bigint
+
+              judges.push({
+                address: judgeAddresses[i],
+                name: judgeNames[i],
+                tokensAllocated: Number(judgeTokens),
+                tokensRemaining: Number(remainingTokens)
+              })
+            } catch (judgeError) {
+              console.error(`Error fetching judge ${i} data:`, judgeError)
+            }
           }
+        } catch (judgeError) {
+          console.error('Error fetching judges:', judgeError)
         }
       }
 
@@ -121,7 +225,7 @@ export default function MyHackathonsPage() {
                 abi: HACKHUB_ABI,
                 functionName: 'projects',
                 args: [userProjectId]
-              }) as Promise<[string, string, string, string]>, // [submitter, prizeRecipient, sourceCode, documentation]
+              }) as Promise<[string, string, string, string]>, // [submitter, recipient, sourceCode, docs]
               publicClient.readContract({
                 address: addr,
                 abi: HACKHUB_ABI,
@@ -175,9 +279,11 @@ export default function MyHackathonsPage() {
         projectCount: Number(projectCount),
         judges,
         projects,
-        description: `Web3 Hackathon with ${formatEther(prizePool)} ETH prize pool`,
+        description: `Web3 Hackathon with ${formatEther(prizePool)} ${tokenSymbol} prize pool`,
         image: "/placeholder.svg?height=200&width=400",
         tags: ["Web3", "Blockchain"],
+        isERC20Prize,
+        prizeTokenSymbol: tokenSymbol,
       }
 
       return hackathon
@@ -207,38 +313,18 @@ export default function MyHackathonsPage() {
         return
       }
 
-      // Get counts for each category
+      // Get counts for each category using the optimized getUserCounts function
       const [
         participantOngoingCount,
         participantPastCount,
         judgeOngoingCount,
         judgePastCount
-      ] = await Promise.all([
-        publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getParticipantOngoingCount',
-          args: [userAddress],
-        }) as Promise<bigint>,
-        publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getParticipantPastCount',
-          args: [userAddress],
-        }) as Promise<bigint>,
-        publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getJudgeOngoingCount',
-          args: [userAddress],
-        }) as Promise<bigint>,
-        publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getJudgePastCount',
-          args: [userAddress],
-        }) as Promise<bigint>
-      ])
+      ] = await publicClient.readContract({
+        address: factoryAddress,
+        abi: HACKHUB_FACTORY_ABI,
+        functionName: 'getUserCounts',
+        args: [userAddress],
+      }) as [bigint, bigint, bigint, bigint]
 
       // Fetch participating hackathons
       let participantAddresses: `0x${string}`[] = []
@@ -248,8 +334,8 @@ export default function MyHackathonsPage() {
         const ongoingParticipant = await publicClient.readContract({
           address: factoryAddress,
           abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getParticipantOngoingHackathons',
-          args: [userAddress, BigInt(0), BigInt(Number(participantOngoingCount) - 1)],
+          functionName: 'getParticipantHackathons',
+          args: [userAddress, BigInt(0), BigInt(Number(participantOngoingCount) - 1), true],
         }) as `0x${string}`[]
         participantAddresses = participantAddresses.concat(ongoingParticipant)
       }
@@ -258,8 +344,8 @@ export default function MyHackathonsPage() {
         const pastParticipant = await publicClient.readContract({
           address: factoryAddress,
           abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getParticipantPastHackathons',
-          args: [userAddress, BigInt(0), BigInt(Number(participantPastCount) - 1)],
+          functionName: 'getParticipantHackathons',
+          args: [userAddress, BigInt(0), BigInt(Number(participantPastCount) - 1), false],
         }) as `0x${string}`[]
         participantAddresses = participantAddresses.concat(pastParticipant)
       }
@@ -272,8 +358,8 @@ export default function MyHackathonsPage() {
         const ongoingJudge = await publicClient.readContract({
           address: factoryAddress,
           abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getJudgeOngoingHackathons',
-          args: [userAddress, BigInt(0), BigInt(Number(judgeOngoingCount) - 1)],
+          functionName: 'getJudgeHackathons',
+          args: [userAddress, BigInt(0), BigInt(Number(judgeOngoingCount) - 1), true],
         }) as `0x${string}`[]
         judgeAddresses = judgeAddresses.concat(ongoingJudge)
       }
@@ -282,25 +368,18 @@ export default function MyHackathonsPage() {
         const pastJudge = await publicClient.readContract({
           address: factoryAddress,
           abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getJudgePastHackathons',
-          args: [userAddress, BigInt(0), BigInt(Number(judgePastCount) - 1)],
+          functionName: 'getJudgeHackathons',
+          args: [userAddress, BigInt(0), BigInt(Number(judgePastCount) - 1), false],
         }) as `0x${string}`[]
         judgeAddresses = judgeAddresses.concat(pastJudge)
       }
 
       // Fetch organizing hackathons (all hackathons where user is owner)
-      const [ongoingCount, pastCount] = await Promise.all([
-        publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getOngoingCount',
-        }) as Promise<bigint>,
-        publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getPastCount',
-        }) as Promise<bigint>,
-      ])
+      const [ongoingCount, pastCount] = await publicClient.readContract({
+        address: factoryAddress,
+        abi: HACKHUB_FACTORY_ABI,
+        functionName: 'getCounts',
+      }) as [bigint, bigint]
 
       let allAddresses: `0x${string}`[] = []
       
@@ -308,8 +387,8 @@ export default function MyHackathonsPage() {
         const ongoingAddrs = await publicClient.readContract({
           address: factoryAddress,
           abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getOngoingHackathons',
-          args: [BigInt(0), BigInt(Number(ongoingCount) - 1)],
+          functionName: 'getHackathons',
+          args: [BigInt(0), BigInt(Number(ongoingCount) - 1), true],
         }) as `0x${string}`[]
         allAddresses = allAddresses.concat(ongoingAddrs)
       }
@@ -318,8 +397,8 @@ export default function MyHackathonsPage() {
         const pastAddrs = await publicClient.readContract({
           address: factoryAddress,
           abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getPastHackathons',
-          args: [BigInt(0), BigInt(Number(pastCount) - 1)],
+          functionName: 'getHackathons',
+          args: [BigInt(0), BigInt(Number(pastCount) - 1), false],
         }) as `0x${string}`[]
         allAddresses = allAddresses.concat(pastAddrs)
       }
@@ -402,7 +481,7 @@ export default function MyHackathonsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-yellow-600" />
-                <span className="font-semibold text-yellow-700">{hackathon.prizePool} ETH</span>
+                <span className="font-semibold text-yellow-700">{formatPrizeAmount(hackathon)}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Vote className="w-4 h-4" style={{color: '#8B6914'}} />
@@ -411,7 +490,7 @@ export default function MyHackathonsPage() {
               <div className="flex items-center gap-2">
                 <Coins className="w-4 h-4 text-green-600" />
                 <span className="text-sm text-gray-600">
-                  {userProject.formattedPrize ? userProject.formattedPrize : `${userProject.estimatedPrize.toFixed(4)} ETH`} estimated
+                  {userProject.formattedPrize ? userProject.formattedPrize : `${userProject.estimatedPrize.toFixed(4)} ${hackathon.prizeTokenSymbol || 'ETH'}`} estimated
                 </span>
               </div>
               <div className="flex items-center gap-2">
@@ -443,12 +522,24 @@ export default function MyHackathonsPage() {
               
               <div className="flex gap-2">
                 {!userProject.prizeClaimed && hackathon.concluded && userProject.tokensReceived > 0 && (
-                  <Button size="sm" className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white">
-                    Claim Prize
+                  <Button 
+                    size="sm" 
+                    className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white"
+                    onClick={() => handleClaimPrize(hackathon.contractAddress, userProject.id)}
+                    disabled={claimingPrizes[`${hackathon.contractAddress}-${userProject.id}`]}
+                  >
+                    {claimingPrizes[`${hackathon.contractAddress}-${userProject.id}`] ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        Claiming...
+                      </>
+                    ) : (
+                      'Claim Prize'
+                    )}
                   </Button>
                 )}
                 <Link href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}>
-                  <Button size="sm" variant="outline" className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-amber-400">
+                  <Button size="sm" variant="outline" className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none">
                     View Details
                   </Button>
                 </Link>
@@ -489,7 +580,7 @@ export default function MyHackathonsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-yellow-600" />
-                <span className="font-semibold text-yellow-700">{hackathon.prizePool} ETH</span>
+                <span className="font-semibold text-yellow-700">{formatPrizeAmount(hackathon)}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Code className="w-4 h-4 text-blue-500" />
@@ -566,7 +657,7 @@ export default function MyHackathonsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-2">
                 <Trophy className="w-4 h-4 text-yellow-600" />
-                <span className="font-semibold text-yellow-700">{hackathon.prizePool} ETH</span>
+                <span className="font-semibold text-yellow-700">{formatPrizeAmount(hackathon)}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Code className="w-4 h-4 text-blue-500" />
@@ -605,12 +696,7 @@ export default function MyHackathonsPage() {
               </div>
               
               <div className="flex gap-2">
-                {status === 'ended' && !hackathon.concluded && (
-                  <Button size="sm" className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white">
-                    Conclude Hackathon
-                  </Button>
-                )}
-                {status === 'active' && (
+                {(status === 'ended' || status === 'active') && (
                   <Link href={`/manage?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}>
                     <Button size="sm" className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white">
                       Manage

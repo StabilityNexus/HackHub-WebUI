@@ -79,19 +79,12 @@ export default function ExplorerPage() {
         return
       }
 
-      // Get counts
-      const [ongoingCount, pastCount] = await Promise.all([
-        publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getOngoingCount',
-        }) as Promise<bigint>,
-        publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getPastCount',
-        }) as Promise<bigint>,
-      ])
+      // Get counts using the optimized getCounts function
+      const [ongoingCount, pastCount] = await publicClient.readContract({
+        address: factoryAddress,
+        abi: HACKHUB_FACTORY_ABI,
+        functionName: 'getCounts',
+      }) as [bigint, bigint]
 
       const ongoing = Number(ongoingCount)
       const past = Number(pastCount)
@@ -102,8 +95,8 @@ export default function ExplorerPage() {
         const ongoingAddrs = await publicClient.readContract({
           address: factoryAddress,
           abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getOngoingHackathons',
-          args: [BigInt(0), BigInt(ongoing - 1)],
+          functionName: 'getHackathons',
+          args: [BigInt(0), BigInt(ongoing - 1), true],
         }) as `0x${string}`[]
         addresses = addresses.concat(ongoingAddrs)
       }
@@ -112,8 +105,8 @@ export default function ExplorerPage() {
         const pastAddrs = await publicClient.readContract({
           address: factoryAddress,
           abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getPastHackathons',
-          args: [BigInt(0), BigInt(past - 1)],
+          functionName: 'getHackathons',
+          args: [BigInt(0), BigInt(past - 1), false],
         }) as `0x${string}`[]
         addresses = addresses.concat(pastAddrs)
       }
