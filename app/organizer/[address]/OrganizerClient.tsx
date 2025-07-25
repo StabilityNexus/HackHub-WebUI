@@ -24,11 +24,13 @@ import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { formatUTCTimestamp } from '@/utils/timeUtils'
 import Image from "next/image"
-import { useRouter, useParams } from "next/navigation"
+import { useRouter } from "next/navigation"
 
-export default function OrganizerClient() {
-  const params = useParams()
-  const address = params?.address as string
+interface OrganizerClientProps {
+  address: string
+}
+
+export default function OrganizerClient({ address }: OrganizerClientProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("All Status")
   
