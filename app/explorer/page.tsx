@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import HackathonCard from "@/components/hackathon-card"
 import { HackathonData, getHackathonStatus } from "@/hooks/useHackathons"
 import { getPublicClient } from "@wagmi/core"
 import { config } from "@/utils/config"
@@ -12,35 +11,24 @@ import { getFactoryAddress } from "@/utils/contractAddress"
 import { HACKHUB_FACTORY_ABI } from "@/utils/contractABI/HackHubFactory"
 import { HACKHUB_ABI } from "@/utils/contractABI/HackHub"
 import { formatEther } from "viem"
-import { categories, featuredHackathons } from "@/lib/data"
-import { Search, Filter, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff, TestTube } from "lucide-react"
+import { Search, Filter, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff, Calendar, DollarSign } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useChainId, useAccount } from "wagmi"
 import { Badge } from "@/components/ui/badge"
+import Link from "next/link"
+import { formatUTCTimestamp } from '@/utils/timeUtils'
+import Image from "next/image"
 
 export default function ExplorerPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All Categories")
   const [statusFilter, setStatusFilter] = useState("All Status")
-  const [useMockData, setUseMockData] = useState(false)
   
-  const [blockchainHackathons, setBlockchainHackathons] = useState<HackathonData[]>([])
+  const [hackathons, setHackathons] = useState<HackathonData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const chainId = useChainId()
   const { isConnected } = useAccount()
-
-  // Use mock data if enabled or if there's an error and no blockchain data
-  const hackathons = useMockData || (error && blockchainHackathons.length === 0) 
-    ? featuredHackathons.map(h => ({
-        ...h,
-        startDate: parseInt(new Date(h.startTime * 1000).toISOString().slice(0, 10).replace(/-/g, '')), // Convert to YYYYMMDD
-        endDate: parseInt(new Date(h.endTime * 1000).toISOString().slice(0, 10).replace(/-/g, '')), // Convert to YYYYMMDD
-        description: h.description || undefined,
-        image: h.image || undefined,
-        tags: h.tags || undefined,
-      }))
-    : blockchainHackathons
 
   // Network info
   const getNetworkName = (chainId: number) => {
@@ -51,6 +39,22 @@ export default function ExplorerPage() {
       case 137: return "Polygon"
       case 11155111: return "Sepolia"
       default: return `Unknown (${chainId})`
+    }
+  }
+
+  // Format date function - now using UTC in 24-hour format
+  const formatDate = (timestamp: number) => {
+    return formatUTCTimestamp(timestamp)
+  }
+
+  // Get status badge color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'bg-green-100 text-green-800 border-green-200'
+      case 'upcoming': return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'ended': return 'bg-orange-100 text-orange-800 border-orange-200'
+      case 'concluded': return 'bg-gray-100 text-gray-800 border-gray-200'
+      default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
   }
 
@@ -65,7 +69,7 @@ export default function ExplorerPage() {
 
       if (!factoryAddress) {
         setError(`Factory contract not deployed on network ${chainId}. Please connect to Scroll Sepolia (Chain ID: 534351).`)
-        setBlockchainHackathons([])
+        setHackathons([])
         return
       }
 
@@ -109,14 +113,14 @@ export default function ExplorerPage() {
       }
 
       if (addresses.length === 0) {
-        setBlockchainHackathons([])
+        setHackathons([])
         return
       }
 
       const hackathonPromises = addresses.map(async (addr, index) => {
         try {
-          const [
-            hackathonName,
+                      const [
+            name,
             startDate,
             startTime,
             endDate,
@@ -129,10 +133,10 @@ export default function ExplorerPage() {
             judgeCount,
             projectCount,
           ] = await Promise.all([
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'hackathonName' }) as Promise<string>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startDate' }) as Promise<bigint>,
+            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'name' }) as Promise<string>,
+            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startDate' }) as Promise<string>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startTime' }) as Promise<bigint>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'endDate' }) as Promise<bigint>,
+            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'endDate' }) as Promise<string>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'endTime' }) as Promise<bigint>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'prizePool' }) as Promise<bigint>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'totalTokens' }) as Promise<bigint>,
@@ -146,7 +150,7 @@ export default function ExplorerPage() {
           const hackathon: HackathonData = {
             id: index,
             contractAddress: addr,
-            hackathonName,
+            hackathonName: name,
             startDate: Number(startDate),
             startTime: Number(startTime),
             endDate: Number(endDate),
@@ -160,9 +164,7 @@ export default function ExplorerPage() {
             projectCount: Number(projectCount),
             judges: [],
             projects: [],
-            description: `Web3 Hackathon with ${formatEther(prizePool)} ETH prize pool`,
             image: "/placeholder.svg?height=200&width=400",
-            tags: ["Web3", "Blockchain"],
           }
 
           return hackathon
@@ -175,7 +177,7 @@ export default function ExplorerPage() {
       const results = await Promise.all(hackathonPromises)
       const validHackathons = results.filter((h): h is HackathonData => h !== null)
 
-      setBlockchainHackathons(validHackathons)
+      setHackathons(validHackathons)
     } catch (err) {
       console.error('Error loading hackathons:', err)
       setError('Failed to load hackathons from blockchain')
@@ -193,13 +195,7 @@ export default function ExplorerPage() {
   const filteredHackathons = hackathons.filter(hackathon => {
     // Search filter
     const matchesSearch = hackathon.hackathonName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (hackathon.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         (hackathon.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          hackathon.judges.some(judge => judge.name.toLowerCase().includes(searchTerm.toLowerCase()))
-    
-    // Category filter
-    const matchesCategory = selectedCategory === "All Categories" || 
-                           (hackathon.tags || []).includes(selectedCategory)
     
     // Status filter
     let matchesStatus = true
@@ -208,7 +204,7 @@ export default function ExplorerPage() {
       matchesStatus = statusFilter.toLowerCase() === status
     }
     
-    return matchesSearch && matchesCategory && matchesStatus
+    return matchesSearch && matchesStatus
   })
 
   // Sort hackathons by status priority (active first, then upcoming, then ended/concluded)
@@ -227,23 +223,6 @@ export default function ExplorerPage() {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
             Explore Hackathons
           </h1>
-          <p className="text-muted-foreground text-lg">Discover amazing Web3 hackathons and join the innovation</p>
-          
-          {/* Network Status */}
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            {isConnected ? (
-              <>
-                <Wifi className="w-4 h-4 text-green-500" />
-                <span>Connected to {getNetworkName(chainId)}</span>
-                <Badge variant="outline" className="ml-2">Chain ID: {chainId}</Badge>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-4 h-4 text-red-500" />
-                <span>Wallet not connected</span>
-              </>
-            )}
-          </div>
         </div>
         
         <div className="flex items-center justify-center py-12">
@@ -301,21 +280,10 @@ export default function ExplorerPage() {
                 </p>
               )}
             </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={() => setUseMockData(!useMockData)}
-                className="text-xs"
-              >
-                <TestTube className="w-3 h-3 mr-1" />
-                {useMockData ? 'Show Blockchain' : 'Show Demo Data'}
-              </Button>
-              <Button variant="outline" size="sm" onClick={loadHackathons}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Retry
-              </Button>
-            </div>
+            <Button variant="outline" size="sm" onClick={loadHackathons}>
+              <RefreshCw className="w-4 h-4 mr-2" />
+              Retry
+            </Button>
           </AlertDescription>
         </Alert>
       </div>
@@ -328,8 +296,6 @@ export default function ExplorerPage() {
         <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
           Explore Hackathons
         </h1>
-        <p className="text-muted-foreground text-lg">Discover amazing Web3 hackathons and join the innovation</p>
-        
       </div>
 
       {/* Search and Filters */}
@@ -338,7 +304,7 @@ export default function ExplorerPage() {
           <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
           <Input 
             placeholder="Search hackathons, judges, or categories..." 
-            className="pl-10"
+            className="pl-10 bg-white text-[#8B6914]"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -346,7 +312,7 @@ export default function ExplorerPage() {
         
         <div className="flex gap-2 flex-wrap lg:flex-nowrap">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full lg:w-[140px]">
+            <SelectTrigger className="w-full lg:w-[140px] bg-white text-[#8B6914]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -360,39 +326,164 @@ export default function ExplorerPage() {
         </div>
       </div>
 
-      {/* Results Summary */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          Showing {sortedHackathons.length} hackathon{sortedHackathons.length !== 1 ? 's' : ''}
-          {selectedCategory !== "All Categories" && ` in ${selectedCategory}`}
-          {statusFilter !== "All Status" && ` with status: ${statusFilter}`}
-          {searchTerm && ` matching "${searchTerm}"`}
-          <Badge variant="secondary" className="ml-2 text-xs">
-            {useMockData ? 'Demo Data' : 'Live Blockchain Data'}
-          </Badge>
-        </div>
-        
-        {(selectedCategory !== "All Categories" || statusFilter !== "All Status" || searchTerm) && (
-          <Button 
-            variant="ghost" 
-            size="sm"
-            onClick={() => {
-              setSearchTerm("")
-              setSelectedCategory("All Categories")
-              setStatusFilter("All Status")
-            }}
-            className="text-amber-700 hover:text-amber-800 hover:bg-amber-50"
-          >
-            Clear Filters
-          </Button>
-        )}
-      </div>
+      {/* Hackathons List */}
+      <div className="space-y-8">
+        {/* Ongoing Hackathons */}
+        {sortedHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'active').length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-amber-800 border-b border-amber-200 pb-2">
+              🔥 Ongoing Hackathons
+            </h2>
+            <div className="space-y-4">
+              {sortedHackathons
+                .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'active')
+                .map((hackathon) => {
+                  const status = getHackathonStatus(hackathon.startTime, hackathon.endTime, hackathon.concluded)
+                  return (
+                    <Link 
+                      key={hackathon.contractAddress} 
+                      href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}
+                      className="block"
+                    >
+                                              <div className="w-full bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative">
+                        {/* Gradient background overlay based on status */}
+                        <div className={`absolute inset-0 transition-all duration-300 ${
+                          status === 'active' 
+                            ? 'bg-gradient-to-r from-amber-50/60 via-orange-50/30 to-amber-50/60 group-hover:from-amber-100/60 group-hover:via-orange-100/30 group-hover:to-amber-100/60'
+                            : status === 'upcoming' 
+                            ? 'bg-gradient-to-r from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
+                            : status === 'ended'
+                            ? 'bg-gradient-to-r from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
+                            : 'bg-gradient-to-r from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
+                        }`}></div>
+                        
+                        <div className="relative z-10 flex items-center justify-between p-6 min-h-[140px]">
+                          {/* Left section - Name and Status */}
+                          <div className="flex items-center gap-4 flex-1">
+                            <div className="space-y-2">
+                              <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-700 transition-colors">
+                                {hackathon.hackathonName}
+                              </h3>
+                              <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
+                                🔥 {status.toUpperCase()}
+                              </Badge>
+                            </div>
+                          </div>
 
-      {/* Hackathons Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sortedHackathons.map((hackathon) => (
-          <HackathonCard key={hackathon.contractAddress} hackathon={hackathon} />
-        ))}
+                          {/* Center section - Block Image */}
+                          <div className="flex-shrink-0 mx-8 relative h-full flex items-center">
+                            <div className="h-32 w-32 relative group-hover:scale-105 transition-transform duration-300">
+                              <Image
+                                src="/block.png"
+                                alt="Blockchain Block"
+                                width={128}
+                                height={128}
+                                className="h-full w-full object-contain"
+                                priority
+                              />
+                            </div>
+                          </div>
+
+                          {/* Right section - Date and Prize */}
+                          <div className="flex flex-col items-end gap-2 flex-1">
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <Calendar className="w-4 h-4" />
+                              <span className="text-sm font-medium">
+                                {formatDate(hackathon.startTime)} - {formatDate(hackathon.endTime)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                              <DollarSign className="w-4 h-4" />
+                              <span>{parseFloat(hackathon.prizePool).toFixed(2)} ETH</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  )
+                })}
+            </div>
+          </div>
+        )}
+
+        {/* Other Hackathons */}
+        {sortedHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'active').length > 0 && (
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-700 border-b border-gray-200 pb-2">
+              Upcoming & Past Hackathons
+            </h2>
+            <div className="space-y-4">
+              {sortedHackathons
+                .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'active')
+                .map((hackathon) => {
+                  const status = getHackathonStatus(hackathon.startTime, hackathon.endTime, hackathon.concluded)
+                  return (
+                    <Link 
+                      key={hackathon.contractAddress} 
+                      href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}
+                      className="block"
+                    >
+                      <div className="w-full bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative">
+                        {/* Gradient background overlay based on status */}
+                        <div className={`absolute inset-0 transition-all duration-300 ${
+                          status === 'upcoming' 
+                            ? 'bg-gradient-to-r from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
+                            : status === 'ended'
+                            ? 'bg-gradient-to-r from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
+                            : 'bg-gradient-to-r from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
+                        }`}></div>
+                        
+                        <div className="relative z-10 flex items-center justify-between p-6 min-h-[140px]">
+                          {/* Left section - Name and Status */}
+                          <div className="flex items-center gap-4 flex-1">
+                            <div className="space-y-2">
+                              <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-700 transition-colors">
+                                {hackathon.hackathonName}
+                              </h3>
+                              <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
+                                {status === 'upcoming' && '⏰'} 
+                                {status === 'ended' && '⏹️'} 
+                                {status === 'concluded' && '✅'} 
+                                {status.toUpperCase()}
+                              </Badge>
+                            </div>
+                          </div>
+
+                          {/* Center section - Block Image */}
+                          <div className="flex-shrink-0 mx-8 relative h-full flex items-center">
+                            <div className="h-32 w-32 relative group-hover:scale-105 transition-transform duration-300">
+                              <Image
+                                src="/block.png"
+                                alt="Blockchain Block"
+                                width={128}
+                                height={128}
+                                className="h-full w-full object-contain"
+                                priority
+                              />
+                            </div>
+                          </div>
+
+                          {/* Right section - Date and Prize */}
+                          <div className="flex flex-col items-end gap-2 flex-1">
+                            <div className="flex items-center gap-2 text-gray-600">
+                              <Calendar className="w-4 h-4" />
+                              <span className="text-sm font-medium">
+                                {formatDate(hackathon.startTime)} - {formatDate(hackathon.endTime)}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                              <DollarSign className="w-4 h-4" />
+                              <span>{parseFloat(hackathon.prizePool).toFixed(2)} ETH</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  )
+                })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* No Results */}
@@ -435,7 +526,7 @@ export default function ExplorerPage() {
       )}
 
       {/* Statistics */}
-      {sortedHackathons.length > 0 && (
+      {/* {sortedHackathons.length > 0 && (
         <div className="bg-gradient-to-r from-amber-50/60 to-orange-50/60 dark:from-amber-900/20 dark:to-orange-900/20 rounded-2xl p-6 border border-amber-100/50 shadow-sm">
           <h3 className="text-lg font-semibold mb-4 text-center text-amber-800">Platform Statistics</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -465,7 +556,7 @@ export default function ExplorerPage() {
             </div>
           </div>
         </div>
-      )}
+      )} */}
     </div>
   )
 }

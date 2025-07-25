@@ -11,10 +11,10 @@ export default function Navigation() {
   const pathname = usePathname()
 
   return (
-    <header className="border-b border-amber-100/60  backdrop-blur-md sticky top-0 z-50 shadow-sm">
+    <header className="border-b border-amber-100/60 bg-white/95 backdrop-blur-md sticky top-0 z-50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-amber-600 to-orange-500 flex items-center justify-center shadow-sm">
               <Zap className="w-5 h-5 text-white" />
             </div>
@@ -27,7 +27,11 @@ export default function Navigation() {
             <Link href="/explorer">
               <Button 
                 variant="ghost"
-                className={pathname === "/explorer" ? "text-amber-700 bg-amber-50/50" : "hover:text-amber-700 hover:bg-amber-50/30"}
+                className={`${
+                  pathname === "/explorer" 
+                    ? "text-amber-800 bg-amber-50 font-semibold shadow-sm" 
+                    : "text-gray-700 hover:text-amber-800 hover:bg-amber-50/80"
+                } transition-all duration-200 font-medium`}
               >
                 Explorer
               </Button>
@@ -35,7 +39,11 @@ export default function Navigation() {
             <Link href="/myHackathons">
               <Button 
                 variant="ghost"
-                className={pathname === "/explorer" ? "text-amber-700 bg-amber-50/50" : "hover:text-amber-700 hover:bg-amber-50/30"}
+                className={`${
+                  pathname === "/myHackathons" 
+                    ? "text-amber-800 bg-amber-50 font-semibold shadow-sm" 
+                    : "text-gray-700 hover:text-amber-800 hover:bg-amber-50/80"
+                } transition-all duration-200 font-medium`}
               >
                 My Hackathons
               </Button>
@@ -43,7 +51,11 @@ export default function Navigation() {
             <Link href="/createHackathon">
               <Button 
                 variant="ghost"
-                className={pathname === "/explorer" ? "text-amber-700 bg-amber-50/50" : "hover:text-amber-700 hover:bg-amber-50/30"}
+                className={`${
+                  pathname === "/createHackathon" 
+                    ? "text-amber-800 bg-amber-50 font-semibold shadow-sm" 
+                    : "text-gray-700 hover:text-amber-800 hover:bg-amber-50/80"
+                } transition-all duration-200 font-medium`}
               >
                 Create
               </Button>
