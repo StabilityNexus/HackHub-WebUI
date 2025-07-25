@@ -25,6 +25,17 @@ import Link from "next/link"
 import { formatUTCTimestamp } from '@/utils/timeUtils'
 import Image from "next/image"
 
+// ERC20 ABI for token symbol
+const ERC20_ABI = [
+  {
+    "inputs": [],
+    "name": "symbol",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const
+
 export default function ExplorerPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All Categories")
@@ -35,6 +46,14 @@ export default function ExplorerPage() {
   const [error, setError] = useState<string | null>(null)
   const chainId = useChainId()
   const { isConnected } = useAccount()
+
+  // Helper function to format prize amounts
+  const formatPrizeAmount = (hackathon: HackathonData) => {
+    if (hackathon.isERC20Prize && hackathon.prizeTokenSymbol) {
+      return `${parseFloat(hackathon.prizePool).toFixed(2)} ${hackathon.prizeTokenSymbol}`
+    }
+    return `${parseFloat(hackathon.prizePool).toFixed(2)} ETH`
+  }
 
   // Network info
   const getNetworkName = (chainId: number) => {
@@ -131,6 +150,8 @@ export default function ExplorerPage() {
             factory,
             judgeCount,
             projectCount,
+            isERC20Prize,
+            prizeToken,
           ] = await Promise.all([
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'name' }) as Promise<string>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startDate' }) as Promise<string>,
@@ -144,7 +165,24 @@ export default function ExplorerPage() {
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'factory' }) as Promise<string>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'judgeCount' }) as Promise<bigint>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'projectCount' }) as Promise<bigint>,
+            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'isERC20Prize' }) as Promise<boolean>,
+            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'prizeToken' }) as Promise<string>,
           ])
+
+          // Get token symbol if it's an ERC20 prize
+          let tokenSymbol = "ETH"
+          if (isERC20Prize && prizeToken !== "0x0000000000000000000000000000000000000000") {
+            try {
+              tokenSymbol = await publicClient.readContract({
+                address: prizeToken as `0x${string}`,
+                abi: ERC20_ABI,
+                functionName: 'symbol',
+              }) as string
+            } catch (err) {
+              console.error('Error fetching token symbol:', err)
+              tokenSymbol = "TOKEN"
+            }
+          }
 
           const hackathon: HackathonData = {
             id: index,
@@ -164,6 +202,8 @@ export default function ExplorerPage() {
             judges: [],
             projects: [],
             image: "/placeholder.svg?height=200&width=400",
+            isERC20Prize,
+            prizeTokenSymbol: tokenSymbol,
           }
 
           return hackathon
@@ -393,7 +433,7 @@ export default function ExplorerPage() {
                             </div>
                             <div className="flex items-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
                               <DollarSign className="w-4 h-4" />
-                              <span>{parseFloat(hackathon.prizePool).toFixed(2)} ETH</span>
+                              <span>{formatPrizeAmount(hackathon)}</span>
                             </div>
                           </div>
                         </div>
@@ -472,7 +512,7 @@ export default function ExplorerPage() {
                             </div>
                             <div className="flex items-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
                               <DollarSign className="w-4 h-4" />
-                              <span>{parseFloat(hackathon.prizePool).toFixed(2)} ETH</span>
+                              <span>{formatPrizeAmount(hackathon)}</span>
                             </div>
                           </div>
                         </div>
