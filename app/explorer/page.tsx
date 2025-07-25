@@ -4,6 +4,12 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+
+// Helper function to get the correct image path for GitHub Pages
+const getImagePath = (path: string) => {
+  const basePath = process.env.NODE_ENV === 'production' ? '/HackHub-WebUI' : '';
+  return `${basePath}${path}`;
+};
 import { HackathonData, getHackathonStatus } from "@/hooks/useHackathons"
 import { getPublicClient } from "@wagmi/core"
 import { config } from "@/utils/config"
@@ -374,7 +380,7 @@ export default function ExplorerPage() {
                           <div className="flex-shrink-0 mx-8 relative h-full flex items-center">
                             <div className="h-32 w-32 relative group-hover:scale-105 transition-transform duration-300">
                               <Image
-                                src="/block.png"
+                                src={getImagePath("/block.png")}
                                 alt="Blockchain Block"
                                 width={128}
                                 height={128}
@@ -453,7 +459,7 @@ export default function ExplorerPage() {
                           <div className="flex-shrink-0 mx-8 relative h-full flex items-center">
                             <div className="h-32 w-32 relative group-hover:scale-105 transition-transform duration-300">
                               <Image
-                                src="/block.png"
+                                src={getImagePath("/block.png")}
                                 alt="Blockchain Block"
                                 width={128}
                                 height={128}
