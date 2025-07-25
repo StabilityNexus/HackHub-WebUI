@@ -30,6 +30,12 @@ import {
 } from "lucide-react"
 import { formatUTCTimestamp } from '@/utils/timeUtils'
 
+// Helper function to get the correct image path for GitHub Pages
+const getImagePath = (path: string) => {
+  const basePath = process.env.NODE_ENV === 'production' ? '/HackHub-WebUI' : '';
+  return `${basePath}${path}`;
+};
+
 export default function HomePage() {
   const [recentHackathons, setRecentHackathons] = useState<HackathonData[]>([])
   const [loading, setLoading] = useState(true)
@@ -268,7 +274,7 @@ export default function HomePage() {
         <div className="flex justify-center lg:justify-end pt-0">
           <div className="relative -mt-8">
             <img 
-              src="/hackhub.png" 
+              src={getImagePath("/hackhub.png")} 
               alt="HackHub - Think, Build, Innovate" 
               className="w-full max-w-md h-auto object-contain drop-shadow-2xl"
             />
@@ -288,7 +294,7 @@ export default function HomePage() {
                 
                 <div className="relative z-10">
                   <img 
-                    src="/handRevolution.png" 
+                    src={getImagePath("/handRevolution.png")} 
                     alt="Be Part of the Revolution" 
                     className="w-full max-w-sm h-auto object-contain drop-shadow-2xl transform hover:scale-105 transition-transform duration-300"
                   />
