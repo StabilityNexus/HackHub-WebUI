@@ -1,14 +1,19 @@
-import { use, Suspense } from 'react'
+import { Suspense } from 'react'
 import OrganizerClient from './OrganizerClient'
 
 interface OrganizerPageProps {
-  params: Promise<{
+  params: {
     address: string
-  }>
+  }
+}
+
+
+export async function generateStaticParams() {
+  return [{ address: "0xplaceholder" }]
 }
 
 export default function OrganizerPage({ params }: OrganizerPageProps) {
-  const { address } = use(params)
+  const { address } = params
   
   return (
     <Suspense fallback={<div className="flex items-center justify-center py-12">Loading...</div>}>
