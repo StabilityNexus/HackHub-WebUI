@@ -10,6 +10,47 @@ body {
   .text-balance {
     text-wrap: balance;
   }
+  
+  /* Custom scrollbar for webkit browsers */
+  .scrollbar-thin::-webkit-scrollbar {
+    height: 6px;
+  }
+  
+  .scrollbar-thumb-amber-300::-webkit-scrollbar-thumb {
+    background-color: #fcd34d;
+    border-radius: 3px;
+  }
+  
+  .scrollbar-track-amber-100::-webkit-scrollbar-track {
+    background-color: #fef3c7;
+    border-radius: 3px;
+  }
+  
+  /* Line clamp utilities */
+  .line-clamp-2 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+  
+  /* Infinite scrolling animation */
+  @keyframes scroll-left {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+  
+  .animate-scroll-left {
+    animation: scroll-left 30s linear infinite;
+  }
+  
+  .animate-scroll-left:hover {
+    animation-play-state: paused;
+  }
 }
 
 @layer base {
@@ -90,5 +131,23 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+  
+  /* Make date and time input icons more visible */
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    opacity: 1 !important;
+    cursor: pointer !important;
+    filter: none !important;
+    color: #374151 !important;
+    background: none !important;
+    display: block !important;
+    width: 20px !important;
+    height: 20px !important;
+  }
+  
+  input[type="date"]::-webkit-calendar-picker-indicator:hover,
+  input[type="time"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 0.8 !important;
   }
 }

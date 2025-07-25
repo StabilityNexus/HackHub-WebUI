@@ -8,16 +8,18 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
+
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { HackathonData, getHackathonStatus, Judge, Project } from "@/hooks/useHackathons"
+
+import { HackathonData, getHackathonStatus, getDaysRemaining, Judge, Project } from "@/hooks/useHackathons"
 import { getPublicClient } from "@wagmi/core"
 import { config } from "@/utils/config"
+import { getFactoryAddress } from "@/utils/contractAddress"
+import { HACKHUB_FACTORY_ABI } from "@/utils/contractABI/HackHubFactory"
 import { HACKHUB_ABI } from "@/utils/contractABI/HackHub"
 import { formatEther } from "viem"
-import { getDaysRemaining } from "@/lib/data"
 import { 
   Trophy, 
   Users, 
@@ -26,33 +28,47 @@ import {
   Target, 
   Calendar,
   ExternalLink,
-  Share2,
   Vote,
   Gavel,
   Code,
   FileText,
   Coins,
-  CheckCircle,
-  XCircle,
   Loader2,
   AlertCircle,
   RefreshCw,
-  Wifi,
-  WifiOff
+  Eye,
+  History
 } from "lucide-react"
 import { useChainId, useAccount, useWriteContract } from "wagmi"
 import { toast } from "sonner"
+import Link from "next/link"
+import { formatUTCTimestamp } from '@/utils/timeUtils'
+
+// ERC20 ABI for token symbol
+const ERC20_ABI = [
+  {
+    "inputs": [],
+    "name": "symbol",
+    "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const
 
 export default function InteractionClient() {
   const [hackathonData, setHackathonData] = useState<HackathonData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [submissionOpen, setSubmissionOpen] = useState(false)
+  const [isERC20Prize, setIsERC20Prize] = useState(false)
+  const [prizeTokenSymbol, setPrizeTokenSymbol] = useState<string>("")
   const [submitting, setSubmitting] = useState(false)
   
   // Form state
   const [sourceCode, setSourceCode] = useState("")
   const [documentation, setDocumentation] = useState("")
+  const [prizeRecipient, setPrizeRecipient] = useState("")
+  const [isEditing, setIsEditing] = useState(false)
   
   const searchParams = useSearchParams()
   const hackAddr = searchParams.get('hackAddr')
@@ -79,6 +95,25 @@ export default function InteractionClient() {
     }
   }
 
+  // Check if user is a judge
+  const isUserJudge = hackathonData?.judges.some(j => 
+    j.address.toLowerCase() === (userAddress || '').toLowerCase()
+  )
+
+  const userJudge = hackathonData?.judges.find(j => 
+    j.address.toLowerCase() === (userAddress || '').toLowerCase()
+  )
+
+  // Helper function to format prize amounts
+  const formatPrizeAmount = (amount: string | number) => {
+    if (isERC20Prize && prizeTokenSymbol) {
+      return `${amount} ${prizeTokenSymbol}`
+    }
+    return `${amount} ETH`
+  }
+
+
+
   // Fetch hackathon data from contract
   const fetchHackathonData = async () => {
     if (!contractAddress) {
@@ -94,7 +129,7 @@ export default function InteractionClient() {
       const publicClient = getPublicClient(config)
       
       const [
-        hackathonName,
+        name,
         startDate,
         startTime,
         endDate,
@@ -106,11 +141,13 @@ export default function InteractionClient() {
         factory,
         judgeCount,
         projectCount,
+        isERC20,
+        prizeToken,
       ] = await Promise.all([
-        publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'hackathonName' }) as Promise<string>,
-        publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'startDate' }) as Promise<bigint>,
+        publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'name' }) as Promise<string>,
+        publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'startDate' }) as Promise<string>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'startTime' }) as Promise<bigint>,
-        publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'endDate' }) as Promise<bigint>,
+        publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'endDate' }) as Promise<string>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'endTime' }) as Promise<bigint>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'prizePool' }) as Promise<bigint>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'totalTokens' }) as Promise<bigint>,
@@ -119,7 +156,28 @@ export default function InteractionClient() {
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'factory' }) as Promise<string>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'judgeCount' }) as Promise<bigint>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'projectCount' }) as Promise<bigint>,
+        publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'isERC20Prize' }) as Promise<boolean>,
+        publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'prizeToken' }) as Promise<string>,
       ])
+
+      // Set prize type
+      setIsERC20Prize(isERC20)
+
+      // Get token symbol if it's an ERC20 prize
+      let tokenSymbol = ""
+      if (isERC20 && prizeToken !== "0x0000000000000000000000000000000000000000") {
+        try {
+          tokenSymbol = await publicClient.readContract({
+            address: prizeToken as `0x${string}`,
+            abi: ERC20_ABI,
+            functionName: 'symbol',
+          }) as string
+        } catch (err) {
+          console.error('Error fetching token symbol:', err)
+          tokenSymbol = "TOKEN"
+        }
+      }
+      setPrizeTokenSymbol(tokenSymbol)
 
       // Fetch judges
       const judges: Judge[] = []
@@ -131,20 +189,13 @@ export default function InteractionClient() {
               abi: HACKHUB_ABI, 
               functionName: 'judges',
               args: [BigInt(i)]
-            }) as [string, string] // [addr, name]
-
-            const judgeTokens = await publicClient.readContract({ 
-              address: contractAddress, 
-              abi: HACKHUB_ABI, 
-              functionName: 'judgeTokens',
-              args: [judgeInfo[0] as `0x${string}`]
-            }) as bigint
+            }) as [string, bigint, string] // [addr, tokens, name]
 
             judges.push({
               address: judgeInfo[0],
-              name: judgeInfo[1],
-              tokensAllocated: Number(judgeTokens), // For display, we'll show current as allocated
-              tokensRemaining: Number(judgeTokens)
+              name: judgeInfo[2],
+              tokensAllocated: Number(judgeInfo[1]),
+              tokensRemaining: Number(judgeInfo[1])
             })
           } catch (judgeError) {
             console.error(`Error fetching judge ${i}:`, judgeError)
@@ -163,11 +214,11 @@ export default function InteractionClient() {
                 abi: HACKHUB_ABI,
                 functionName: 'projects',
                 args: [BigInt(i)]
-              }) as Promise<[string, string, string]>, // [submitter, sourceCode, documentation]
+              }) as Promise<[string, string, string, string]>, // [submitter, prizeRecipient, sourceCode, documentation]
               publicClient.readContract({
                 address: contractAddress,
                 abi: HACKHUB_ABI,
-                functionName: 'getProjectTokens',
+                functionName: 'projectTokens',
                 args: [BigInt(i)]
               }) as Promise<bigint>,
               publicClient.readContract({
@@ -184,13 +235,17 @@ export default function InteractionClient() {
               }) as Promise<boolean>
             ])
 
+            const prizeAmount = Number(formatEther(projectPrize))
+            console.log(`Project ${i}: projectPrize=${projectPrize}, prizeAmount=${prizeAmount}, isERC20Prize=${isERC20Prize}, tokenSymbol=${tokenSymbol}`)
             projects.push({
               id: i,
               submitter: projectInfo[0],
-              sourceCode: projectInfo[1],
-              documentation: projectInfo[2],
+              prizeRecipient: projectInfo[1],
+              sourceCode: projectInfo[2],
+              documentation: projectInfo[3],
               tokensReceived: Number(projectTokens),
-              estimatedPrize: Number(formatEther(projectPrize)),
+              estimatedPrize: prizeAmount,
+              formattedPrize: isERC20Prize && tokenSymbol ? `${prizeAmount.toFixed(4)} ${tokenSymbol}` : `${prizeAmount.toFixed(4)} ETH`,
               prizeClaimed
             })
           } catch (projectError) {
@@ -202,7 +257,7 @@ export default function InteractionClient() {
       const hackathon: HackathonData = {
         id: 0, // Not used for individual pages
         contractAddress,
-        hackathonName,
+        hackathonName: name,
         startDate: Number(startDate),
         startTime: Number(startTime),
         endDate: Number(endDate),
@@ -216,9 +271,7 @@ export default function InteractionClient() {
         projectCount: Number(projectCount),
         judges,
         projects,
-        description: `Web3 Hackathon with ${formatEther(prizePool)} ETH prize pool`,
         image: "/placeholder.svg?height=300&width=1200",
-        tags: ["Web3", "Blockchain"],
       }
 
       setHackathonData(hackathon)
@@ -230,10 +283,10 @@ export default function InteractionClient() {
     }
   }
 
-  // Submit project
+  // Submit or edit project
   const handleSubmitProject = async () => {
     if (!sourceCode.trim() || !documentation.trim()) {
-      toast.error("Please fill in both source code URL and documentation")
+      toast.error("Please provide both source code and documentation links")
       return
     }
 
@@ -250,17 +303,32 @@ export default function InteractionClient() {
     try {
       setSubmitting(true)
       
-      await writeContract({
-        address: contractAddress,
-        abi: HACKHUB_ABI,
-        functionName: 'submitProject',
-        args: [sourceCode.trim(), documentation.trim()],
-      })
+      // Use prize recipient if provided, otherwise use user's address
+      const recipient = prizeRecipient.trim() || userAddress
 
-      toast.success("Project submitted successfully!")
+      if (isEditing) {
+        await writeContract({
+          address: contractAddress,
+          abi: HACKHUB_ABI,
+          functionName: 'submitProject',
+          args: [sourceCode.trim(), documentation.trim(), recipient as `0x${string}`],
+        })
+        toast.success("Project updated successfully!")
+      } else {
+        await writeContract({
+          address: contractAddress,
+          abi: HACKHUB_ABI,
+          functionName: 'submitProject',
+          args: [sourceCode.trim(), documentation.trim(), recipient as `0x${string}`],
+        })
+        toast.success("Project submitted successfully!")
+      }
+
       setSubmissionOpen(false)
       setSourceCode("")
       setDocumentation("")
+      setPrizeRecipient("")
+      setIsEditing(false)
       
       // Refresh data after submission
       setTimeout(() => {
@@ -274,6 +342,19 @@ export default function InteractionClient() {
       setSubmitting(false)
     }
   }
+
+  // Handle edit project
+  const handleEditProject = () => {
+    if (!userProject) return
+    
+    setSourceCode(userProject.sourceCode)
+    setDocumentation(userProject.documentation)
+    setPrizeRecipient(userProject.prizeRecipient === userAddress ? "" : userProject.prizeRecipient)
+    setIsEditing(true)
+    setSubmissionOpen(true)
+  }
+
+
 
   // Load data on mount
   useEffect(() => {
@@ -314,7 +395,7 @@ export default function InteractionClient() {
     return (
       <div className="flex items-center justify-center py-12">
         <div className="text-center space-y-4">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto text-purple-500" />
+          <Loader2 className="w-8 h-8 animate-spin mx-auto" style={{color: '#8B6914'}} />
           <p className="text-muted-foreground">Loading hackathon data...</p>
           <p className="text-sm text-muted-foreground">
             {isConnected ? `Fetching from ${getNetworkName(chainId)}` : 'Please connect your wallet'}
@@ -390,107 +471,144 @@ export default function InteractionClient() {
 
   return (
     <div className="space-y-8">
-      {/* Header */}
-      <div className="relative">
-        <img 
-          src={hackathonData.image?.replace("400", "1200").replace("200", "300") || "/placeholder.svg?height=300&width=1200"} 
-          alt={hackathonData.hackathonName}
-          className="w-full h-64 object-cover rounded-2xl"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-purple-900/80 to-blue-900/80 rounded-2xl" />
-        <div className="absolute inset-0 flex items-center justify-center text-center text-white p-8">
-          <div className="space-y-4">
-            <h1 className="text-4xl font-bold">{hackathonData.hackathonName}</h1>
-            <p className="text-xl opacity-90">{hackathonData.description}</p>
-            <div className="flex items-center justify-center gap-6 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Trophy className="w-5 h-5 text-yellow-400" />
-                <span className="text-lg font-semibold">{hackathonData.prizePool} ETH Prize Pool</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Users className="w-5 h-5 text-blue-400" />
-                <span className="text-lg">{hackathonData.projectCount} Projects Submitted</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Gavel className="w-5 h-5 text-purple-400" />
-                <span className="text-lg">{hackathonData.judgeCount} Judges</span>
-              </div>
-            </div>
-            <div className="flex justify-center">
+      {/* Header - Enhanced with custom image background */}
+      <div className="relative overflow-hidden rounded-2xl shadow-2xl">
+        {/* Background Image */}
+        <div className="absolute inset-0">
+          <img 
+            src="/hacka-thon.jpg"
+            alt="Hackathon Background"
+            className="w-full h-80 object-cover"
+          />
+          {/* Gradient Overlay for better text readability */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+        </div>
+        
+        {/* Content Overlay */}
+        <div className="relative z-10 flex items-center justify-between h-80 p-8">
+          {/* Left side - Hackathon Info */}
+          <div className="flex-1 space-y-6">
+            {/* Status Badge */}
+            <div className="flex items-center space-x-4">
               {getStatusBadge()}
+              <span className="text-white/90 text-sm font-medium">
+                Network: {getNetworkName(chainId)}
+              </span>
+            </div>
+            
+            {/* Hackathon Name - Main focal point */}
+            <div className="space-y-3">
+              <h1 className="text-5xl font-black text-white leading-tight tracking-tight">
+                {hackathonData.hackathonName}
+              </h1>
+              <div className="flex items-center space-x-6 text-white/90">
+                <div className="flex items-center space-x-2">
+                  <Trophy className="w-5 h-5 text-yellow-400" />
+                  <span className="text-xl font-bold">{formatPrizeAmount(hackathonData.prizePool)}</span>
+                  <span className="text-lg">Prize Pool</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Users className="w-5 h-5 text-blue-400" />
+                  <span className="text-lg">{hackathonData.projectCount} Projects</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Network Status */}
-      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-        {isConnected ? (
-          <>
-            <Wifi className="w-4 h-4 text-green-500" />
-            <span>Connected to {getNetworkName(chainId)}</span>
-            <Badge variant="outline" className="ml-2">Chain ID: {chainId}</Badge>
-            {urlChainId && chainId !== parseInt(urlChainId) && (
-              <Badge variant="destructive" className="ml-2">Expected: {urlChainId}</Badge>
-            )}
-          </>
-        ) : (
-          <>
-            <WifiOff className="w-4 h-4 text-red-500" />
-            <span>Wallet not connected</span>
-            {urlChainId && (
-              <Badge variant="outline" className="ml-2">Expected Chain: {urlChainId}</Badge>
-            )}
-          </>
-        )}
+        
+        {/* Bottom Decorative Element */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500"></div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          <Card className="border-0 shadow-lg">
+          {/* About This Hackathon */}
+          <Card className="border bg-white shadow-sm">
             <CardHeader>
-              <CardTitle>About This Hackathon</CardTitle>
+              <CardTitle className="text-black">About This Hackathon</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground leading-relaxed mb-4">
-                {hackathonData.description}
+              <p className="text-muted-foreground text-black leading-relaxed mb-4">
+                Join this Web3 hackathon and compete for a share of the {formatPrizeAmount(hackathonData.prizePool)} prize pool. 
+                Submit your project during the submission period and get votes from judges to win prizes.
               </p>
               <div className="grid grid-cols-2 gap-4 mt-6">
-                <div className="text-center p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
-                  <Vote className="w-8 h-8 text-purple-500 mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-purple-600">{hackathonData.totalTokens}</p>
-                  <p className="text-sm text-muted-foreground">Total Voting Tokens</p>
+                <div className="text-center p-4 bg-gray-50 rounded-lg border">
+                  <Vote className="w-8 h-8 mx-auto mb-2" style={{color: '#8B6914'}} />
+                  <p className="text-2xl font-bold" style={{color: '#8B6914'}}>{hackathonData.totalTokens}</p>
+                  <p className="text-md font-bold text-gray-800 text-muted-foreground">Total Voting Tokens</p>
                 </div>
-                <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                  <Coins className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-                  <p className="text-2xl font-bold text-yellow-600">{hackathonData.prizePool} ETH</p>
-                  <p className="text-sm text-muted-foreground">Prize Pool</p>
+                <div className="text-center p-4 bg-gray-50 rounded-lg border" >
+                  <Coins className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
+                  <p className="text-2xl font-bold" style={{color: '#8B6914'}}>{formatPrizeAmount(hackathonData.prizePool)}</p>
+                  <p className="text-md font-bold text-gray-800 text-muted-foreground">Prize Pool</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Timeline */}
+          <Card className="border shadow-sm bg-white">
+            <CardHeader>
+              <CardTitle className="flex items-center text-black gap-2">
+                <Calendar className="w-5 h-5" style={{color: '#8B6914'}} />
+                Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <div className={`w-3 h-3 rounded-full ${status === 'upcoming' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
+                  <div>
+                    <p className="font-semibold text-gray-800">Hackathon Starts</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatUTCTimestamp(hackathonData.startTime)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className={`w-3 h-3 rounded-full ${status === 'ended' || status === 'concluded' ? 'bg-green-500' : status === 'active' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                  <div>
+                    <p className="font-semibold text-gray-800">Submission Deadline</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatUTCTimestamp(hackathonData.endTime)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className={`w-3 h-3 rounded-full ${hackathonData.concluded ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+                  <div>
+                    <p className="font-semibold text-gray-800">Hackathon Concluded</p>
+                    <p className="text-sm text-muted-foreground">
+                      {hackathonData.concluded ? 'Completed - Winners can claim prizes' : 'Pending organizer conclusion'}
+                    </p>
+                  </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Judges Section */}
-          <Card className="border-0 shadow-lg">
+          <Card className="border bg-white shadow-sm">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Gavel className="w-5 h-5 text-purple-500" />
+              <CardTitle className="flex items-center text-black gap-2">
+                <Gavel className="w-5 h-5" style={{color: '#8B6914'}} />
                 Judges & Voting Tokens
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
                 {hackathonData.judges.map((judge, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
                     <div className="flex items-center gap-3">
                       <Avatar className="w-10 h-10">
-                        <AvatarFallback className="bg-purple-100 text-purple-600">
+                        <AvatarFallback className="bg-amber-100 text-amber-700">
                           {judge.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="font-semibold">{judge.name}</p>
+                        <p className="font-semibold text-gray-800">{judge.name}</p>
                         <p className="text-sm text-muted-foreground">
                           {judge.address.slice(0, 6)}...{judge.address.slice(-4)}
                         </p>
@@ -501,124 +619,11 @@ export default function InteractionClient() {
                         <span className="text-sm text-muted-foreground">
                           {judge.tokensRemaining} tokens
                         </span>
-                        <Vote className="w-4 h-4 text-purple-500" />
+                        <Vote className="w-4 h-4 text-amber-600" />
                       </div>
                     </div>
                   </div>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Projects Section */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Code className="w-5 h-5 text-blue-500" />
-                Submitted Projects ({hackathonData.projectCount})
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {hackathonData.projects.length > 0 ? (
-                <div className="space-y-4">
-                  {hackathonData.projects.map((project, index) => (
-                    <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <h4 className="font-semibold">Project #{project.id}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            By {project.submitter.slice(0, 6)}...{project.submitter.slice(-4)}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Vote className="w-4 h-4 text-purple-500" />
-                            <span className="font-semibold">{project.tokensReceived} tokens</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Trophy className="w-4 h-4 text-yellow-500" />
-                            <span className="text-sm text-yellow-600">{project.estimatedPrize.toFixed(4)} ETH</span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <p className="text-sm text-muted-foreground mb-3">{project.documentation}</p>
-                      
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <a 
-                            href={project.sourceCode} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                            Source Code
-                          </a>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {project.prizeClaimed ? (
-                            <Badge className="bg-green-500 text-white">
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              Prize Claimed
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline">
-                              <XCircle className="w-3 h-3 mr-1" />
-                              Prize Pending
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8">
-                  <Code className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-muted-foreground">No projects submitted yet</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Timeline */}
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-green-500" />
-                Timeline
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className={`w-3 h-3 rounded-full ${status === 'upcoming' ? 'bg-blue-500' : 'bg-green-500'}`}></div>
-                  <div>
-                    <p className="font-semibold">Hackathon Starts</p>
-                    <p className="text-sm text-muted-foreground">
-                      {startDate.toLocaleDateString()} at {startDate.toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className={`w-3 h-3 rounded-full ${status === 'ended' || status === 'concluded' ? 'bg-green-500' : status === 'active' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
-                  <div>
-                    <p className="font-semibold">Submission Deadline</p>
-                    <p className="text-sm text-muted-foreground">
-                      {endDate.toLocaleDateString()} at {endDate.toLocaleTimeString()}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className={`w-3 h-3 rounded-full ${hackathonData.concluded ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-                  <div>
-                    <p className="font-semibold">Hackathon Concluded</p>
-                    <p className="text-sm text-muted-foreground">
-                      {hackathonData.concluded ? 'Completed - Winners can claim prizes' : 'Pending organizer conclusion'}
-                    </p>
-                  </div>
-                </div>
               </div>
             </CardContent>
           </Card>
@@ -626,64 +631,89 @@ export default function InteractionClient() {
 
         {/* Sidebar */}
         <div className="space-y-6">
-          <Card className="border-0 shadow-lg">
+          {/* Quick Stats - Enhanced */}
+          <Card className="border bg-white shadow-sm">
             <CardHeader>
-              <CardTitle>Quick Stats</CardTitle>
+              <CardTitle className="text-black">Quick Stats</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Status</span>
+                <span className="text-muted-foreground text-gray-800">Status</span>
                 {getStatusBadge()}
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Contract</span>
-                <span className="text-sm font-mono">
+                <span className="text-muted-foreground text-gray-800">Contract</span>
+                <span className="text-sm font-mono text-gray-800">
                   {hackathonData.contractAddress.slice(0, 6)}...{hackathonData.contractAddress.slice(-4)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Organizer</span>
-                <span className="text-sm font-mono">
+                <span className="text-muted-foreground text-gray-800">Organizer</span>
+                <span className="text-sm font-mono text-gray-800">
                   {hackathonData.organizer.slice(0, 6)}...{hackathonData.organizer.slice(-4)}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Total Tokens</span>
-                <span className="font-semibold">{hackathonData.totalTokens}</span>
+                <span className="text-muted-foreground text-gray-800">Total Tokens</span>
+                <span className="font-semibold text-gray-800">{hackathonData.totalTokens}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground">Projects</span>
-                <span className="font-semibold">{hackathonData.projectCount}</span>
+                <span className="text-muted-foreground text-gray-800">Projects</span>
+                <span className="font-semibold text-gray-800">{hackathonData.projectCount}</span>
+              </div>
+              
+              {/* Organizer Past Events Button */}
+              <div className="pt-2">
+                <Link href={`/organizer/${hackathonData.organizer}`}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full text-[#8B6914] bg-[#FAE5C3] hover:bg-[#8B6914] hover:text-white border-none"
+                  >
+                    <History className="w-4 h-4 mr-2" />
+                    View Organizer's Events
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-lg">
-            <CardHeader>
-              <CardTitle>Categories</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-2">
-                {hackathonData.tags?.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-xs">
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Judge Voting Interface */}
+          {isUserJudge && (
+            <Card className="border shadow-sm border-black bg-white">
+              <CardContent className="p-6">
+                <div className="text-center space-y-4">
+                  <Gavel className="w-12 h-12 mx-auto" style={{color: '#8B6914'}} />
+                  <h3 className="font-bold text-lg text-gray-800">Judge Panel</h3>
+                  <p className="text-sm text-muted-foreground text-gray-800">
+                    You have {userJudge?.tokensRemaining} voting tokens remaining
+                  </p>
+                  
+                  <Link href={`/h/judge?hackAddr=${hackAddr}&chainId=${urlChainId}`}>
+                    <Button 
+                      className="w-full text-[#8B6914] bg-[#FAE5C3] hover:bg-[#8B6914] hover:text-white mt-4"
+                      disabled={!hackathonData.projects.length}
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      Open Judge Panel
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Project Submission */}
           {status === 'active' && (
-            <Card className="border-0 shadow-lg bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-900/20 dark:to-blue-900/20">
+            <Card className="border shadow-sm border-black bg-white">
               <CardContent className="p-6">
                 <div className="text-center space-y-4">
-                  <Target className="w-12 h-12 text-purple-500 mx-auto" />
-                  <h3 className="font-bold text-lg">Ready to Participate?</h3>
+                  <Target className="w-12 h-12 mx-auto" style={{color: '#8B6914'}} />
+                  <h3 className="font-bold text-lg text-gray-800">Ready to Participate?</h3>
                   {userProject ? (
-                    <div className="space-y-2">
-                      <p className="text-sm text-green-600">✓ You have already submitted a project!</p>
-                      <p className="text-xs text-muted-foreground">
+                    <div className="space-y-3">
+                      <p className="text-sm text-green-600 text-gray-800">✓ You have already submitted a project!</p>
+                      <p className="text-xs text-muted-foreground text-gray-800">
                         Project #{userProject.id} - {userProject.tokensReceived} votes received
                       </p>
                     </div>
@@ -696,17 +726,30 @@ export default function InteractionClient() {
                   <Dialog open={submissionOpen} onOpenChange={setSubmissionOpen}>
                     <DialogTrigger asChild>
                       <Button 
-                        className="w-full bg-gradient-to-r from-purple-500 to-blue-500 hover:from-purple-600 hover:to-blue-600 text-white"
-                        disabled={!isConnected || !!userProject}
+                        className="w-full text-[#8B6914] bg-[#FAE5C3] hover:bg-[#8B6914] hover:text-white mt-4 border-none"
+                        disabled={!isConnected}
+                        onClick={() => {
+                          if (userProject) {
+                            handleEditProject()
+                          } else {
+                            setIsEditing(false)
+                            setSourceCode("")
+                            setDocumentation("")
+                            setPrizeRecipient("")
+                          }
+                        }}
                       >
-                        {!isConnected ? 'Connect Wallet' : userProject ? 'Already Submitted' : 'Submit Project'}
+                        {!isConnected ? 'Connect Wallet' : userProject ? 'Edit Submission' : 'Submit Project'}
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-md">
                       <DialogHeader>
-                        <DialogTitle>Submit Your Project</DialogTitle>
+                        <DialogTitle>{isEditing ? 'Edit Your Project' : 'Submit Your Project'}</DialogTitle>
                         <DialogDescription>
-                          Submit your project to participate in this hackathon. Make sure your source code is publicly accessible.
+                          {isEditing 
+                            ? 'Update your project submission details.' 
+                            : 'Submit your project with source code and documentation links. Both must be publicly accessible.'
+                          }
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
@@ -720,20 +763,40 @@ export default function InteractionClient() {
                           />
                         </div>
                         <div className="space-y-2">
-                          <Label htmlFor="documentation">Project Documentation</Label>
-                          <Textarea
+                          <Label htmlFor="documentation">Documentation Link</Label>
+                          <Input
                             id="documentation"
-                            placeholder="Describe your project, features, and how it addresses the hackathon theme..."
+                            placeholder="https://docs.google.com/document/... or README link"
                             value={documentation}
                             onChange={(e) => setDocumentation(e.target.value)}
-                            rows={4}
                           />
+                          <p className="text-xs text-muted-foreground">
+                            Link to your project documentation (README, Google Docs, etc.)
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="prizeRecipient">Prize Recipient Address (Optional)</Label>
+                          <Input
+                            id="prizeRecipient"
+                            placeholder="Leave empty to use your wallet address"
+                            value={prizeRecipient}
+                            onChange={(e) => setPrizeRecipient(e.target.value)}
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            The address that will receive the prize if your project wins. Leave empty to use your connected wallet address.
+                          </p>
                         </div>
                       </div>
                       <DialogFooter>
                         <Button 
                           variant="outline" 
-                          onClick={() => setSubmissionOpen(false)}
+                          onClick={() => {
+                            setSubmissionOpen(false)
+                            setIsEditing(false)
+                            setSourceCode("")
+                            setDocumentation("")
+                            setPrizeRecipient("")
+                          }}
                           disabled={submitting}
                         >
                           Cancel
@@ -745,10 +808,10 @@ export default function InteractionClient() {
                           {submitting ? (
                             <>
                               <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Submitting...
+                              {isEditing ? 'Updating...' : 'Submitting...'}
                             </>
                           ) : (
-                            'Submit Project'
+                            isEditing ? 'Update Project' : 'Submit Project'
                           )}
                         </Button>
                       </DialogFooter>
@@ -758,38 +821,12 @@ export default function InteractionClient() {
               </CardContent>
             </Card>
           )}
-
-          <Card className="border-0 shadow-lg">
-            <CardContent className="p-6">
-              <div className="text-center space-y-4">
-                <Share2 className="w-8 h-8 text-gray-400 mx-auto" />
-                <h3 className="font-semibold">Share This Hackathon</h3>
-                <Button 
-                  variant="outline" 
-                  className="w-full"
-                  onClick={() => {
-                    navigator.clipboard.writeText(window.location.href)
-                    toast.success("Link copied to clipboard!")
-                  }}
-                >
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Copy Link
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={fetchHackathonData}
-            className="w-full flex items-center gap-2"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh Data
-          </Button>
         </div>
       </div>
+
+
+
+
     </div>
   )
 }

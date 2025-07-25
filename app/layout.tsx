@@ -1,7 +1,7 @@
 import '@rainbow-me/rainbowkit/styles.css'
 import type { Metadata } from 'next'
 import './globals.css'
-import { ThemeProvider } from '@/components/theme-provider'
+// import { ThemeProvider } from '@/components/theme-provider'
 import { WalletProvider } from '@/providers/WalletProvider'
 import Navigation from '@/components/navigation'
 
@@ -20,17 +20,17 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-[#f9fafb]">
         <WalletProvider>
-          <ThemeProvider
+          {/* <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
             disableTransitionOnChange
-          >
+          > */}
             <Navigation />
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
               {children}
             </main>
-          </ThemeProvider>
+          {/* </ThemeProvider> */}
         </WalletProvider>
       </body>
     </html>

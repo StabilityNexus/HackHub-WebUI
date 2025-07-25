@@ -8,17 +8,7 @@ export const HACKHUB_FACTORY_ABI = [
       },
       {
         "internalType": "uint256",
-        "name": "startDate",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
         "name": "startTime",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "endDate",
         "type": "uint256"
       },
       {
@@ -27,9 +17,24 @@ export const HACKHUB_FACTORY_ABI = [
         "type": "uint256"
       },
       {
+        "internalType": "string",
+        "name": "startDate",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "endDate",
+        "type": "string"
+      },
+      {
         "internalType": "address[]",
         "name": "judges",
         "type": "address[]"
+      },
+      {
+        "internalType": "uint256[]",
+        "name": "tokenPerJudge",
+        "type": "uint256[]"
       },
       {
         "internalType": "string[]",
@@ -37,15 +42,40 @@ export const HACKHUB_FACTORY_ABI = [
         "type": "string[]"
       },
       {
-        "internalType": "uint256[]",
-        "name": "tokenPerJudge",
-        "type": "uint256[]"
+        "internalType": "address",
+        "name": "prizeToken",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "prizeAmount",
+        "type": "uint256"
       }
     ],
     "name": "createHackathon",
     "outputs": [],
     "stateMutability": "payable",
     "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "OnlyOngoingHackathons",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "OnlyHackathonContract",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "HackathonNotOngoing",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "TokenTransferFailed",
+    "type": "error"
   },
   {
     "inputs": [
@@ -71,54 +101,6 @@ export const HACKHUB_FACTORY_ABI = [
     "name": "hackathonConcluded",
     "outputs": [],
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "startIndex",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "endIndex",
-        "type": "uint256"
-      }
-    ],
-    "name": "getOngoingHackathons",
-    "outputs": [
-      {
-        "internalType": "address[]",
-        "name": "",
-        "type": "address[]"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "startIndex",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "endIndex",
-        "type": "uint256"
-      }
-    ],
-    "name": "getPastHackathons",
-    "outputs": [
-      {
-        "internalType": "address[]",
-        "name": "",
-        "type": "address[]"
-      }
-    ],
-    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -150,18 +132,66 @@ export const HACKHUB_FACTORY_ABI = [
   {
     "inputs": [
       {
+        "internalType": "uint256",
+        "name": "start",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "end",
+        "type": "uint256"
+      }
+    ],
+    "name": "getOngoingHackathons",
+    "outputs": [
+      {
+        "internalType": "address[]",
+        "name": "",
+        "type": "address[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "start",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "end",
+        "type": "uint256"
+      }
+    ],
+    "name": "getPastHackathons",
+    "outputs": [
+      {
+        "internalType": "address[]",
+        "name": "",
+        "type": "address[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "address",
         "name": "participant",
         "type": "address"
       },
       {
         "internalType": "uint256",
-        "name": "startIndex",
+        "name": "start",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "endIndex",
+        "name": "end",
         "type": "uint256"
       }
     ],
@@ -185,12 +215,12 @@ export const HACKHUB_FACTORY_ABI = [
       },
       {
         "internalType": "uint256",
-        "name": "startIndex",
+        "name": "start",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "endIndex",
+        "name": "end",
         "type": "uint256"
       }
     ],
@@ -214,12 +244,12 @@ export const HACKHUB_FACTORY_ABI = [
       },
       {
         "internalType": "uint256",
-        "name": "startIndex",
+        "name": "start",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "endIndex",
+        "name": "end",
         "type": "uint256"
       }
     ],
@@ -243,12 +273,12 @@ export const HACKHUB_FACTORY_ABI = [
       },
       {
         "internalType": "uint256",
-        "name": "startIndex",
+        "name": "start",
         "type": "uint256"
       },
       {
         "internalType": "uint256",
-        "name": "endIndex",
+        "name": "end",
         "type": "uint256"
       }
     ],
