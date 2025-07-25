@@ -13,4 +13,4 @@ export default async function OrganizerPage({ params }: { params: Promise<{ addr
       <OrganizerClient address={address} />
     </Suspense>
   )
-} 
+}

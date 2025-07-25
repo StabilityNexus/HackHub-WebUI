@@ -13,6 +13,12 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 
+// Helper function to get the correct image path for GitHub Pages
+const getImagePath = (path: string) => {
+  const basePath = process.env.NODE_ENV === 'production' ? '/HackHub-WebUI' : '';
+  return `${basePath}${path}`;
+};
+
 import { HackathonData, getHackathonStatus, getDaysRemaining, Judge, Project } from "@/hooks/useHackathons"
 import { getPublicClient } from "@wagmi/core"
 import { config } from "@/utils/config"
@@ -476,7 +482,7 @@ export default function InteractionClient() {
         {/* Background Image */}
         <div className="absolute inset-0">
           <img 
-            src="/hacka-thon.jpg"
+            src={getImagePath("/hacka-thon.jpg")}
             alt="Hackathon Background"
             className="w-full h-80 object-cover"
           />
