@@ -378,8 +378,10 @@ export default function CreateHackathon() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <Button
+            variant="outline"
+            
             onClick={() => router.push('/explorer')}
-            className="flex items-center gap-2 bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white"
+            className="flex items-center gap-2 border-amber-600 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Explorer
@@ -646,7 +648,7 @@ export default function CreateHackathon() {
                   onClick={addJudge}
                   variant="outline"
                   size="sm"
-                  className="flex items-center gap-2 bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white border-none"
+                  className="flex items-center gap-2 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none border-amber-600"
                 >
                   <Plus className="w-4 h-4" />
                   Add Judge

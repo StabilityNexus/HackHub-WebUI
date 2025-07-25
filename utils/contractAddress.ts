@@ -1,5 +1,5 @@
 export const HackHubFactoryAddress: { [key: number]: `0x${string}` } = {
-  534351: '0x6a849b62070e1d059576a38153bb5058fb25276a',
+  534351: '0x7ddde464666e0e70eefb74aeed99c303483206ee',
 }
 
 export const getFactoryAddress = (chainId: number): `0x${string}` | undefined => {

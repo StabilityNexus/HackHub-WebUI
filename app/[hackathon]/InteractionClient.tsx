@@ -188,25 +188,52 @@ export default function InteractionClient() {
       // Fetch judges
       const judges: Judge[] = []
       if (Number(judgeCount) > 0) {
-        for (let i = 0; i < Number(judgeCount); i++) {
-          try {
-            const judgeInfo = await publicClient.readContract({ 
+        try {
+          const [judgeAddresses, judgeNames] = await Promise.all([
+            publicClient.readContract({ 
               address: contractAddress, 
               abi: HACKHUB_ABI, 
-              functionName: 'judges',
-              args: [BigInt(i)]
-            }) as [string, bigint, string] // [addr, tokens, name]
+              functionName: 'getJudges',
+              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+            }) as Promise<string[]>,
+            publicClient.readContract({ 
+              address: contractAddress, 
+              abi: HACKHUB_ABI, 
+              functionName: 'getJudgeNames',
+              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+            }) as Promise<string[]>
+          ])
 
-            const tokensAllocated = Number(judgeInfo[1])
-            judges.push({
-              address: judgeInfo[0],
-              name: judgeInfo[2],
-              tokensAllocated,
-              tokensRemaining: tokensAllocated // Will be calculated below
-            })
-          } catch (judgeError) {
-            console.error(`Error fetching judge ${i}:`, judgeError)
+          for (let i = 0; i < judgeAddresses.length; i++) {
+            try {
+              // Get judge tokens allocated and remaining
+              const [judgeTokens, remainingTokens] = await Promise.all([
+                publicClient.readContract({
+                  address: contractAddress,
+                  abi: HACKHUB_ABI,
+                  functionName: 'judgeTokens',
+                  args: [judgeAddresses[i] as `0x${string}`]
+                }) as Promise<bigint>,
+                publicClient.readContract({
+                  address: contractAddress,
+                  abi: HACKHUB_ABI,
+                  functionName: 'remainingJudgeTokens',
+                  args: [judgeAddresses[i] as `0x${string}`]
+                }) as Promise<bigint>
+              ])
+
+              judges.push({
+                address: judgeAddresses[i],
+                name: judgeNames[i],
+                tokensAllocated: Number(judgeTokens),
+                tokensRemaining: Number(remainingTokens)
+              })
+            } catch (judgeError) {
+              console.error(`Error fetching judge ${i} data:`, judgeError)
+            }
           }
+        } catch (judgeError) {
+          console.error('Error fetching judges:', judgeError)
         }
       }
 
@@ -221,7 +248,7 @@ export default function InteractionClient() {
                 abi: HACKHUB_ABI,
                 functionName: 'projects',
                 args: [BigInt(i)]
-              }) as Promise<[string, string, string, string]>, // [submitter, prizeRecipient, sourceCode, documentation]
+              }) as Promise<[string, string, string, string]>, // [submitter, recipient, sourceCode, docs]
               publicClient.readContract({
                 address: contractAddress,
                 abi: HACKHUB_ABI,
@@ -261,30 +288,7 @@ export default function InteractionClient() {
         }
       }
 
-      // Calculate remaining tokens for each judge by checking their votes across all projects
-      if (judges.length > 0 && Number(projectCount) > 0) {
-        for (const judge of judges) {
-          let tokensUsed = 0
-          
-          // Sum up all votes this judge has cast across all projects
-          for (let projectId = 0; projectId < Number(projectCount); projectId++) {
-            try {
-              const voteAmount = await publicClient.readContract({
-                address: contractAddress,
-                abi: HACKHUB_ABI,
-                functionName: 'judgeVotes',
-                args: [judge.address as `0x${string}`, BigInt(projectId)]
-              }) as bigint
-              
-              tokensUsed += Number(voteAmount)
-            } catch (err) {
-              console.error(`Error fetching votes for judge ${judge.address} on project ${projectId}:`, err)
-            }
-          }
-          
-          judge.tokensRemaining = judge.tokensAllocated - tokensUsed
-        }
-      }
+      // Remaining tokens are already fetched directly from the contract above
 
       const hackathon: HackathonData = {
         id: 0, // Not used for individual pages
@@ -647,11 +651,18 @@ export default function InteractionClient() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-muted-foreground">
-                          {judge.tokensRemaining} tokens
-                        </span>
-                        <Vote className="w-4 h-4 text-amber-600" />
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-gray-800">
+                            {judge.tokensAllocated} total
+                          </span>
+                          <Vote className="w-4 h-4 text-amber-600" />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">
+                            {judge.tokensRemaining} remaining
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -686,10 +697,6 @@ export default function InteractionClient() {
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-gray-800">Total Tokens</span>
-                <span className="font-semibold text-gray-800">{hackathonData.totalTokens}</span>
-              </div>
-              <div className="flex items-center justify-between">
                 <span className="text-muted-foreground text-gray-800">Projects</span>
                 <span className="font-semibold text-gray-800">{hackathonData.projectCount}</span>
               </div>
@@ -700,7 +707,7 @@ export default function InteractionClient() {
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    className="w-full text-[#8B6914] bg-[#FAE5C3] hover:bg-[#8B6914] hover:text-white border-none"
+                    className="w-full border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
                   >
                     <History className="w-4 h-4 mr-2" />
                     View Organizer's Events
@@ -723,7 +730,9 @@ export default function InteractionClient() {
                   
                   <Link href={`/h/judge?hackAddr=${hackAddr}&chainId=${urlChainId}`}>
                     <Button 
-                      className="w-full text-[#8B6914] bg-[#FAE5C3] hover:bg-[#8B6914] hover:text-white mt-4"
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none mt-4 border-amber-300"
                       disabled={!hackathonData.projects.length}
                     >
                       <Eye className="w-4 h-4 mr-2" />
@@ -758,7 +767,7 @@ export default function InteractionClient() {
                   <Dialog open={submissionOpen} onOpenChange={setSubmissionOpen}>
                     <DialogTrigger asChild>
                       <Button 
-                        className="w-full text-[#8B6914] bg-[#FAE5C3] hover:bg-[#8B6914] hover:text-white mt-4 border-none"
+                        className="w-full border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
                         disabled={!isConnected}
                         onClick={() => {
                           if (userProject) {

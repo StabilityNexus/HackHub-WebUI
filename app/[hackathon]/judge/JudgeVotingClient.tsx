@@ -72,6 +72,7 @@ export default function JudgeVotingClient() {
   
   // Form state
   const [voteAmounts, setVoteAmounts] = useState<{[key: number]: number}>({})
+  const [currentVotes, setCurrentVotes] = useState<{[key: number]: number}>({}) // Track current votes by this judge
   const [totalAllocated, setTotalAllocated] = useState(0)
   
   const searchParams = useSearchParams()
@@ -186,25 +187,52 @@ export default function JudgeVotingClient() {
       // Fetch judges
       const judges: Judge[] = []
       if (Number(judgeCount) > 0) {
-        for (let i = 0; i < Number(judgeCount); i++) {
-          try {
-            const judgeInfo = await publicClient.readContract({ 
+        try {
+          const [judgeAddresses, judgeNames] = await Promise.all([
+            publicClient.readContract({ 
               address: contractAddress, 
               abi: HACKHUB_ABI, 
-              functionName: 'judges',
-              args: [BigInt(i)]
-            }) as [string, bigint, string] // [addr, tokens, name]
+              functionName: 'getJudges',
+              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+            }) as Promise<string[]>,
+            publicClient.readContract({ 
+              address: contractAddress, 
+              abi: HACKHUB_ABI, 
+              functionName: 'getJudgeNames',
+              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+            }) as Promise<string[]>
+          ])
 
-            const tokensAllocated = Number(judgeInfo[1])
-            judges.push({
-              address: judgeInfo[0],
-              name: judgeInfo[2],
-              tokensAllocated,
-              tokensRemaining: tokensAllocated // Will be calculated below
-            })
-          } catch (judgeError) {
-            console.error(`Error fetching judge ${i}:`, judgeError)
+          for (let i = 0; i < judgeAddresses.length; i++) {
+            try {
+              // Get judge tokens allocated and remaining
+              const [judgeTokens, remainingTokens] = await Promise.all([
+                publicClient.readContract({
+                  address: contractAddress,
+                  abi: HACKHUB_ABI,
+                  functionName: 'judgeTokens',
+                  args: [judgeAddresses[i] as `0x${string}`]
+                }) as Promise<bigint>,
+                publicClient.readContract({
+                  address: contractAddress,
+                  abi: HACKHUB_ABI,
+                  functionName: 'remainingJudgeTokens',
+                  args: [judgeAddresses[i] as `0x${string}`]
+                }) as Promise<bigint>
+              ])
+
+              judges.push({
+                address: judgeAddresses[i],
+                name: judgeNames[i],
+                tokensAllocated: Number(judgeTokens),
+                tokensRemaining: Number(remainingTokens)
+              })
+            } catch (judgeError) {
+              console.error(`Error fetching judge ${i} data:`, judgeError)
+            }
           }
+        } catch (judgeError) {
+          console.error('Error fetching judges:', judgeError)
         }
       }
 
@@ -219,7 +247,7 @@ export default function JudgeVotingClient() {
                 abi: HACKHUB_ABI,
                 functionName: 'projects',
                 args: [BigInt(i)]
-              }) as Promise<[string, string, string, string]>, // [submitter, prizeRecipient, sourceCode, documentation]
+              }) as Promise<[string, string, string, string]>, // [submitter, recipient, sourceCode, docs]
               publicClient.readContract({
                 address: contractAddress,
                 abi: HACKHUB_ABI,
@@ -258,30 +286,29 @@ export default function JudgeVotingClient() {
         }
       }
 
-      // Calculate remaining tokens for each judge by checking their votes across all projects
-      if (judges.length > 0 && Number(projectCount) > 0) {
-        for (const judge of judges) {
-          let tokensUsed = 0
-          
-          // Sum up all votes this judge has cast across all projects
-          for (let projectId = 0; projectId < Number(projectCount); projectId++) {
-            try {
-              const voteAmount = await publicClient.readContract({
-                address: contractAddress,
-                abi: HACKHUB_ABI,
-                functionName: 'judgeVotes',
-                args: [judge.address as `0x${string}`, BigInt(projectId)]
-              }) as bigint
-              
-              tokensUsed += Number(voteAmount)
-            } catch (err) {
-              console.error(`Error fetching votes for judge ${judge.address} on project ${projectId}:`, err)
-            }
+      // Note: judges[i].tokens from contract already contains remaining tokens
+      // No additional calculation needed as contract updates this in real-time
+
+      // Fetch current votes by the logged-in judge for each project
+      const judgeCurrentVotes: {[key: number]: number} = {}
+      if (userAddress && Number(projectCount) > 0) {
+        for (let projectId = 0; projectId < Number(projectCount); projectId++) {
+          try {
+            const voteAmount = await publicClient.readContract({
+              address: contractAddress,
+              abi: HACKHUB_ABI,
+              functionName: 'judgeVotes',
+              args: [userAddress as `0x${string}`, BigInt(projectId)]
+            }) as bigint
+            
+            judgeCurrentVotes[projectId] = Number(voteAmount)
+          } catch (err) {
+            console.error(`Error fetching current vote for project ${projectId}:`, err)
+            judgeCurrentVotes[projectId] = 0
           }
-          
-          judge.tokensRemaining = judge.tokensAllocated - tokensUsed
         }
       }
+      setCurrentVotes(judgeCurrentVotes)
 
       const hackathon: HackathonData = {
         id: 0, // Not used for individual pages
@@ -506,7 +533,7 @@ export default function JudgeVotingClient() {
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <Link href={`/h?hackAddr=${hackAddr}&chainId=${urlChainId}`}>
-            <Button variant="outline" size="sm" className="border-[#8B6914] bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white border-none">
+            <Button variant="outline" size="sm" className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Hackathon
             </Button>
@@ -561,7 +588,7 @@ export default function JudgeVotingClient() {
               </Button>
               <Button
                 onClick={handleBatchVote}
-                disabled={voting || totalAllocated === 0 || totalAllocated > (userJudge?.tokensRemaining || 0)}
+                disabled={voting || totalAllocated === 0}
                 className="text-white hover:opacity-90"
                 style={{backgroundColor: '#8B6914'}}
               >
@@ -577,15 +604,21 @@ export default function JudgeVotingClient() {
             </div>
           </div>
           
-          {totalAllocated > (userJudge?.tokensRemaining || 0) && (
-            <Alert className="mt-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                You've allocated {totalAllocated} tokens but only have {userJudge?.tokensRemaining || 0} remaining.
-                Please adjust your allocation.
-              </AlertDescription>
-            </Alert>
-          )}
+          {(() => {
+            // Calculate total available tokens (remaining + current votes that can be reused)
+            const totalAvailable = (userJudge?.tokensRemaining || 0) + 
+              Object.values(currentVotes).reduce((sum, votes) => sum + votes, 0)
+            return totalAllocated > totalAvailable && (
+              <Alert className="mt-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  You've allocated {totalAllocated} tokens but only have {totalAvailable} available 
+                  ({userJudge?.tokensRemaining || 0} remaining + {Object.values(currentVotes).reduce((sum, votes) => sum + votes, 0)} from existing votes).
+                  Please adjust your allocation.
+                </AlertDescription>
+              </Alert>
+            )
+          })()}
         </CardContent>
       </Card>
 
@@ -696,8 +729,8 @@ export default function JudgeVotingClient() {
                                 id={`vote-${project.id}`}
                                 type="number"
                                 min="0"
-                                max={userJudge?.tokensRemaining || 0}
-                                placeholder="Enter tokens"
+                                max={(userJudge?.tokensRemaining || 0) + (currentVotes[project.id] || 0)}
+                                placeholder={currentVotes[project.id] ? `Current: ${currentVotes[project.id]}` : "Enter tokens"}
                                 value={voteAmounts[project.id] || ""}
                                 onFocus={(e) => {
                                   if (e.target.value === "0") {
@@ -717,21 +750,36 @@ export default function JudgeVotingClient() {
                           <Button
                             size="sm"
                             onClick={() => handleVoteOnProject(project.id, voteAmounts[project.id] || 0)}
-                            disabled={!voteAmounts[project.id] || voting || voteAmounts[project.id] > (userJudge?.tokensRemaining || 0)}
+                            disabled={
+                              !voteAmounts[project.id] || 
+                              voting || 
+                              voteAmounts[project.id] > ((userJudge?.tokensRemaining || 0) + (currentVotes[project.id] || 0))
+                            }
                             className="text-white hover:opacity-90"
                             style={{backgroundColor: '#8B6914'}}
                           >
-                            {voting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Vote Now'}
+                            {voting ? <Loader2 className="w-4 h-4 animate-spin" /> : (currentVotes[project.id] ? 'Update Vote' : 'Vote Now')}
                           </Button>
                         </div>
 
-                        <div className="text-right">
-                          <p className="text-sm text-muted-foreground">Current Votes</p>
-                          <div className="flex items-center gap-1">
-                            <Vote className="w-4 h-4" style={{color: '#8B6914'}} />
-                            <span className="font-semibold" style={{color: '#8B6914'}}>
-                              {project.tokensReceived}
-                            </span>
+                        <div className="text-right space-y-2">
+                          <div>
+                            <p className="text-sm text-muted-foreground">Your Current Vote</p>
+                            <div className="flex items-center justify-end gap-1">
+                              <Vote className="w-4 h-4 text-blue-600" />
+                              <span className="font-semibold text-blue-600">
+                                {currentVotes[project.id] || 0}
+                              </span>
+                            </div>
+                          </div>
+                          <div>
+                            <p className="text-sm text-muted-foreground">Total Project Votes</p>
+                            <div className="flex items-center justify-end gap-1">
+                              <Vote className="w-4 h-4" style={{color: '#8B6914'}} />
+                              <span className="font-semibold" style={{color: '#8B6914'}}>
+                                {project.tokensReceived}
+                              </span>
+                            </div>
                           </div>
                         </div>
                       </div>

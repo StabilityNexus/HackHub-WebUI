@@ -72,6 +72,8 @@ export default function ManageHackathonPage() {
   const [error, setError] = useState<string | null>(null)
   const [adjustingTokens, setAdjustingTokens] = useState<{[key: string]: boolean}>({})
   const [tokenAdjustments, setTokenAdjustments] = useState<{[key: string]: string}>({})
+  const [adjustingPrizePool, setAdjustingPrizePool] = useState(false)
+  const [newPrizeAmount, setNewPrizeAmount] = useState("")
 
   // Handle judge token adjustment
   const handleAdjustJudgeTokens = async (judgeAddress: string, newAmount: number) => {
@@ -100,6 +102,58 @@ export default function ManageHackathonPage() {
       setError('Failed to adjust judge tokens: ' + (err?.message || 'Unknown error'))
     } finally {
       setAdjustingTokens(prev => ({ ...prev, [judgeAddress]: false }))
+    }
+  }
+
+  // Handle prize pool adjustment
+  const handleAdjustPrizePool = async () => {
+    if (!hackAddr || !userAddress || !newPrizeAmount) return
+
+    const newAmountFloat = parseFloat(newPrizeAmount)
+    const currentAmountFloat = parseFloat(hackathonInfo?.prizePool || "0")
+
+    if (newAmountFloat <= currentAmountFloat) {
+      setError('New prize amount must be greater than current prize pool')
+      return
+    }
+
+    try {
+      setAdjustingPrizePool(true)
+      setError(null)
+
+      if (hackathonInfo?.isERC20Prize) {
+        // For ERC20 prizes, no ETH value needed
+        await writeContract({
+          address: hackAddr,
+          abi: HACKHUB_ABI,
+          functionName: 'adjustPrizePool',
+          args: [BigInt(Math.floor(newAmountFloat * 1e18))], // Convert to wei-like units for ERC20
+        })
+      } else {
+        // For ETH prizes, send the difference as value
+        const differenceInWei = BigInt(Math.floor((newAmountFloat - currentAmountFloat) * 1e18))
+        await writeContract({
+          address: hackAddr,
+          abi: HACKHUB_ABI,
+          functionName: 'adjustPrizePool',
+          args: [BigInt(Math.floor(newAmountFloat * 1e18))],
+          value: differenceInWei
+        })
+      }
+
+      // Clear the input
+      setNewPrizeAmount("")
+      
+      // Refresh data after a delay
+      setTimeout(() => {
+        loadHackathonData()
+      }, 2000)
+      
+    } catch (err: any) {
+      console.error('Error adjusting prize pool:', err)
+      setError('Failed to adjust prize pool: ' + (err?.message || 'Unknown error'))
+    } finally {
+      setAdjustingPrizePool(false)
     }
   }
 
@@ -177,24 +231,43 @@ export default function ManageHackathonPage() {
       // Fetch judges
       const judgeList: JudgeInfo[] = []
       if (Number(judgeCount) > 0) {
-        for (let i = 0; i < Number(judgeCount); i++) {
-          try {
-            // Get judge info using the new structure
-            const judgeInfo = await publicClient.readContract({ 
+        try {
+          const [judgeAddresses, judgeNames] = await Promise.all([
+            publicClient.readContract({ 
               address: hackAddr, 
               abi: HACKHUB_ABI, 
-              functionName: 'judges',
-              args: [BigInt(i)]
-            }) as [string, bigint, string] // [addr, tokens, name]
+              functionName: 'getJudges',
+              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+            }) as Promise<string[]>,
+            publicClient.readContract({ 
+              address: hackAddr, 
+              abi: HACKHUB_ABI, 
+              functionName: 'getJudgeNames',
+              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+            }) as Promise<string[]>
+          ])
 
-            judgeList.push({
-              address: judgeInfo[0],
-              name: judgeInfo[2],
-              tokensAllocated: Number(judgeInfo[1])
-            })
-          } catch (judgeError) {
-            console.error(`Error fetching judge ${i}:`, judgeError)
+          for (let i = 0; i < judgeAddresses.length; i++) {
+            try {
+              // Get judge tokens allocated
+              const judgeTokens = await publicClient.readContract({
+                address: hackAddr,
+                abi: HACKHUB_ABI,
+                functionName: 'judgeTokens',
+                args: [judgeAddresses[i] as `0x${string}`]
+              }) as bigint
+
+              judgeList.push({
+                address: judgeAddresses[i],
+                name: judgeNames[i],
+                tokensAllocated: Number(judgeTokens)
+              })
+            } catch (judgeError) {
+              console.error(`Error fetching judge ${i} data:`, judgeError)
+            }
           }
+        } catch (judgeError) {
+          console.error('Error fetching judges:', judgeError)
         }
       }
 
@@ -440,6 +513,76 @@ export default function ManageHackathonPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Adjust Prize Pool */}
+      {!hackathonInfo.concluded && (
+        <Card className="bg-white">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-black">
+              <Coins className="w-5 h-5" />
+              Adjust Prize Pool
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="bg-gray-50 p-4 rounded-lg border">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-gray-700">Current Prize Pool:</span>
+                <span className="font-bold text-lg text-[#8B6914]">
+                  {formatPrizeAmount(hackathonInfo.prizePool)}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600">
+                {hackathonInfo.isERC20Prize 
+                  ? 'ERC20 token prize pool' 
+                  : 'ETH prize pool'
+                }
+              </p>
+            </div>
+            
+            <div className="space-y-3">
+              <Label htmlFor="newPrizeAmount" className="text-sm font-medium text-gray-700">
+                New Prize Amount {hackathonInfo.isERC20Prize ? `(${hackathonInfo.prizeTokenSymbol})` : '(ETH)'}
+              </Label>
+              <div className="flex items-center gap-3">
+                <Input
+                  id="newPrizeAmount"
+                  type="number"
+                  step="0.001"
+                  min={parseFloat(hackathonInfo.prizePool) + 0.001}
+                  placeholder={`Enter amount greater than ${hackathonInfo.prizePool}`}
+                  value={newPrizeAmount}
+                  onChange={(e) => setNewPrizeAmount(e.target.value)}
+                  className="bg-white border-gray-300 text-black"
+                />
+                <Button
+                  onClick={handleAdjustPrizePool}
+                  disabled={
+                    adjustingPrizePool || 
+                    !newPrizeAmount || 
+                    parseFloat(newPrizeAmount) <= parseFloat(hackathonInfo.prizePool)
+                  }
+                  className="bg-[#8B6914] text-white hover:bg-[#A0471D]"
+                >
+                  {adjustingPrizePool ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      Updating...
+                    </>
+                  ) : (
+                    'Update Prize Pool'
+                  )}
+                </Button>
+              </div>
+              <p className="text-xs text-gray-600">
+                {hackathonInfo.isERC20Prize 
+                  ? 'You must approve additional tokens before calling this function.'
+                  : 'Additional ETH will be sent with the transaction to increase the prize pool.'
+                }
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Conclude Hackathon */}
       {!hackathonInfo.concluded && (
