@@ -670,7 +670,7 @@ export default function InteractionClient() {
               
               {/* Organizer Past Events Button */}
               <div className="pt-2">
-                <Link href={`/organizer/${hackathonData.organizer}`}>
+                <Link href={`/organizer?address=${hackathonData.organizer}`}>
                   <Button 
                     variant="outline" 
                     size="sm" 
