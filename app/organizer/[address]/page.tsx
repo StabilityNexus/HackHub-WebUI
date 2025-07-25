@@ -8,7 +8,12 @@ export async function generateStaticParams() {
 // Allow runtime paths not defined in generateStaticParams
 export const dynamicParams = true
 
-export default async function OrganizerPage({ params }: { params: { address: string } }) {
+export default async function OrganizerPage({
+  params,
+}: {
+  params: { address: string }
+  searchParams?: { [key: string]: string | string[] | undefined }
+}) {
   const { address } = params
   
   return (
