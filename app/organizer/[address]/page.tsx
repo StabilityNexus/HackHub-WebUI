@@ -1,18 +1,11 @@
 import { Suspense } from 'react'
 import OrganizerClient from './OrganizerClient'
 
-interface OrganizerPageProps {
-  params: {
-    address: string
-  }
-}
-
-
 export async function generateStaticParams() {
   return [{ address: "0xplaceholder" }]
 }
 
-export default function OrganizerPage({ params }: OrganizerPageProps) {
+export default function OrganizerPage({ params }: { params: { address: string } }) {
   const { address } = params
   
   return (
