@@ -63,9 +63,9 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
   // Get status badge color
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 border-green-200'
+      case 'accepting-submissions': return 'bg-green-100 text-green-800 border-green-200'
       case 'upcoming': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'ended': return 'bg-orange-100 text-orange-800 border-orange-200'
+      case 'judging-submissions': return 'bg-orange-100 text-orange-800 border-orange-200'
       case 'concluded': return 'bg-gray-100 text-gray-800 border-gray-200'
       default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
@@ -224,7 +224,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
     const statusA = getHackathonStatus(a.startTime, a.endTime, a.concluded)
     const statusB = getHackathonStatus(b.startTime, b.endTime, b.concluded)
     
-    const statusPriority = { 'active': 0, 'upcoming': 1, 'ended': 2, 'concluded': 3 }
+    const statusPriority = { 'accepting-submissions': 0, 'upcoming': 1, 'judging-submissions': 2, 'concluded': 3 }
     return statusPriority[statusA] - statusPriority[statusB]
   })
 
@@ -423,14 +423,14 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
           {/* Hackathons List */}
           <div className="space-y-8">
             {/* Ongoing Hackathons */}
-            {sortedHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'active').length > 0 && (
+            {sortedHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'accepting-submissions').length > 0 && (
               <div className="space-y-4">
                 <h2 className="text-2xl font-bold text-amber-800 border-b border-amber-200 pb-2">
                   🔥 Ongoing Hackathons
                 </h2>
                 <div className="space-y-4">
                   {sortedHackathons
-                    .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'active')
+                    .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'accepting-submissions')
                     .map((hackathon) => {
                       const status = getHackathonStatus(hackathon.startTime, hackathon.endTime, hackathon.concluded)
                       return (
@@ -501,14 +501,14 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
             )}
 
             {/* Other Hackathons */}
-            {sortedHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'active').length > 0 && (
+            {sortedHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'accepting-submissions').length > 0 && (
               <div className="space-y-4">
                 <h2 className="text-2xl font-bold text-gray-700 border-b border-gray-200 pb-2">
                   Upcoming & Past Hackathons
                 </h2>
                 <div className="space-y-4">
                   {sortedHackathons
-                    .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'active')
+                    .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'accepting-submissions')
                     .map((hackathon) => {
                       const status = getHackathonStatus(hackathon.startTime, hackathon.endTime, hackathon.concluded)
                       return (

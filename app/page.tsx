@@ -210,12 +210,12 @@ export default function HomePage() {
   // Get status badge color and style
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'active':
+      case 'accepting-submissions':
         return { className: 'bg-green-500 text-white', label: 'LIVE' }
       case 'upcoming':
         return { className: 'bg-blue-500 text-white', label: 'UPCOMING' }
-      case 'ended':
-        return { className: 'bg-orange-500 text-white', label: 'ENDED' }
+      case 'judging-submissions':
+        return { className: 'bg-orange-500 text-white', label: 'JUDGING' }
       case 'concluded':
         return { className: 'bg-gray-500 text-white', label: 'CONCLUDED' }
       default:
@@ -240,23 +240,19 @@ export default function HomePage() {
             <div className="relative z-10">
               <h1 className="text-6xl lg:text-7xl font-black leading-tight">
                 <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 drop-shadow-sm">
-                  Welcome
-                </span>
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-orange-600 via-amber-500 to-orange-700 mt-2">
-                  to
+                Welcome to the Hub for
                 </span>
                 <span className="block text-6xl lg:text-8xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-orange-600 to-amber-800 mt-4 tracking-tight">
-                  HackHub
+                  On-Chain Hackathons.
                 </span>
               </h1>
               
                              {/* Accent line */}
                <div className="mt-6 w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg"></div>
                
-               {/* Think. Build. Innovate. text */}
                <div className="mt-8">
                  <p className="text-xl lg:text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-600 tracking-wider">
-                   THINK. BUILD. INNOVATE.
+                 Transparent. Permissionless. Easy.
                  </p>
                </div>
              </div>
@@ -287,10 +283,7 @@ export default function HomePage() {
                 <div className="relative z-10 mt-">
                   <h2 className="text-4xl lg:text-5xl font-black leading-tight">
                     <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700">
-                      Be Part of the
-                    </span>
-                    <span className="block text-3xl lg:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-orange-600 to-amber-800 mt-3">
-                      Revolution Ecosystem
+                      Think. Build. Innovate.
                     </span>
                   </h2>
                   
