@@ -489,10 +489,10 @@ export default function InteractionClient() {
     switch (status) {
       case 'upcoming':
         return <Badge className="bg-blue-500 hover:bg-blue-600 text-white">Upcoming</Badge>
-      case 'active':
-        return <Badge className="bg-green-500 hover:bg-green-600 text-white">Active - {daysRemaining} days left</Badge>
-      case 'ended':
-        return <Badge className="bg-orange-500 hover:bg-orange-600 text-white">Submission Ended</Badge>
+      case 'accepting-submissions':
+        return <Badge className="bg-green-500 hover:bg-green-600 text-white">Accepting Submissions - {daysRemaining} days left</Badge>
+      case 'judging-submissions':
+        return <Badge className="bg-orange-500 hover:bg-orange-600 text-white">Judging Submissions</Badge>
       case 'concluded':
         return <Badge className="bg-gray-500 hover:bg-gray-600 text-white">Concluded</Badge>
       default:
@@ -604,7 +604,7 @@ export default function InteractionClient() {
                   </div>
                 </div>
                 <div className="flex items-center gap-4">
-                  <div className={`w-3 h-3 rounded-full ${status === 'ended' || status === 'concluded' ? 'bg-green-500' : status === 'active' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+                  <div className={`w-3 h-3 rounded-full ${status === 'judging-submissions' || status === 'concluded' ? 'bg-green-500' : status === 'accepting-submissions' ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
                   <div>
                     <p className="font-semibold text-gray-800">Submission Deadline</p>
                     <p className="text-sm text-muted-foreground">
@@ -745,7 +745,7 @@ export default function InteractionClient() {
           )}
 
           {/* Project Submission */}
-          {status === 'active' && (
+          {status === 'accepting-submissions' && (
             <Card className="border shadow-sm border-black bg-white">
               <CardContent className="p-6">
                 <div className="text-center space-y-4">

@@ -23,10 +23,10 @@ export default function HackathonCard({ hackathon, showJoinButton = true }: Hack
     switch (status) {
       case 'upcoming':
         return <Badge className="bg-blue-500 hover:bg-blue-600 text-white shadow-sm">Upcoming</Badge>
-      case 'active':
-        return <Badge className="bg-green-500 hover:bg-green-600 text-white shadow-sm">{daysRemaining} days left</Badge>
-      case 'ended':
-        return <Badge className="bg-orange-500 hover:bg-orange-600 text-white shadow-sm">Ended</Badge>
+      case 'accepting-submissions':
+        return <Badge className="bg-green-500 hover:bg-green-600 text-white shadow-sm">Accepting Submissions</Badge>
+      case 'judging-submissions':
+        return <Badge className="bg-orange-500 hover:bg-orange-600 text-white shadow-sm">Judging Submissions</Badge>
       case 'concluded':
         return <Badge className="bg-slate-500 hover:bg-slate-600 text-white shadow-sm">Concluded</Badge>
       default:

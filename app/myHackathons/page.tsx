@@ -514,9 +514,9 @@ export default function MyHackathonsPage() {
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-blue-500" />
                 <span className="text-sm text-gray-600">
-                  {status === 'active' ? `${getDaysRemaining(hackathon.endTime)} days left` : 
+                  {status === 'accepting-submissions' ? `${getDaysRemaining(hackathon.endTime)} days left` : 
                    status === 'upcoming' ? 'Not started' : 
-                   status === 'ended' ? 'Ended' : 'Concluded'}
+                   status === 'judging-submissions' ? 'Judging Submissions' : 'Concluded'}
                 </span>
               </div>
               
@@ -610,14 +610,14 @@ export default function MyHackathonsPage() {
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-blue-500" />
                 <span className="text-sm text-gray-600">
-                  {status === 'active' ? `${getDaysRemaining(hackathon.endTime)} days left to submit` : 
+                  {status === 'accepting-submissions' ? `${getDaysRemaining(hackathon.endTime)} days left to submit` : 
                    status === 'upcoming' ? 'Not started' : 
-                   status === 'ended' ? 'Voting period - submissions closed' : 'Concluded'}
+                   status === 'judging-submissions' ? 'Voting period - submissions closed' : 'Concluded'}
                 </span>
               </div>
               
               <div className="flex gap-2">
-                {status === 'ended' && userJudge.tokensRemaining > 0 && (
+                {status === 'judging-submissions' && userJudge.tokensRemaining > 0 && (
                   <Link href={`/h/judge?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}>
                     <Button size="sm" className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white">
                       Vote on Projects
@@ -689,14 +689,14 @@ export default function MyHackathonsPage() {
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4 text-blue-500" />
                 <span className="text-sm text-gray-600">
-                  {status === 'active' ? `${getDaysRemaining(hackathon.endTime)} days left` : 
+                  {status === 'accepting-submissions' ? `${getDaysRemaining(hackathon.endTime)} days left` : 
                    status === 'upcoming' ? 'Not started' : 
-                   status === 'ended' ? 'Ended' : 'Concluded'}
+                   status === 'judging-submissions' ? 'Judging Submissions' : 'Concluded'}
                 </span>
               </div>
               
               <div className="flex gap-2">
-                {(status === 'ended' || status === 'active') && (
+                {(status === 'judging-submissions' || status === 'accepting-submissions') && (
                   <Link href={`/manage?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}>
                     <Button size="sm" className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white">
                       Manage
@@ -855,10 +855,13 @@ export default function MyHackathonsPage() {
             {activeTab === "judging" && "You haven't been assigned as a judge yet. Stay tuned for opportunities!"}
             {activeTab === "organizing" && "You haven't organized any hackathons yet. Create your first event!"}
           </p>
-          <Button className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white">
-            {activeTab === "participating" ? "Explore Hackathons" : 
-             activeTab === "judging" ? "Browse Opportunities" : "Create Hackathon"}
-          </Button>
+          <Link href={activeTab === "participating" ? "/explorer" : 
+                     activeTab === "judging" ? "/explorer" : "/createHackathon"}>
+            <Button className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white">
+              {activeTab === "participating" ? "Explore Hackathons" : 
+               activeTab === "judging" ? "Browse Opportunities" : "Create Hackathon"}
+            </Button>
+          </Link>
         </div>
       )}
     </div>

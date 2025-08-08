@@ -48,6 +48,7 @@ export default function CreateHackathon() {
   
   const [timezoneMode, setTimezoneMode] = useState<TimezoneMode>('local')
   const [prizePoolType, setPrizePoolType] = useState<'eth' | 'token'>('eth')
+  const [tokenSymbol, setTokenSymbol] = useState<string>('')
   
   const [judges, setJudges] = useState<Judge[]>([
     { address: '', name: '', tokens: '' }
@@ -87,6 +88,33 @@ export default function CreateHackathon() {
                !!formData.prizePool
     }
   })
+
+  // Fetch token symbol
+  const { data: fetchedTokenSymbol } = useReadContract({
+    address: formData.tokenAddress as `0x${string}`,
+    abi: [
+      {
+        "inputs": [],
+        "name": "symbol",
+        "outputs": [{"internalType": "string", "name": "", "type": "string"}],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ] as const,
+    functionName: 'symbol',
+    query: {
+      enabled: prizePoolType === 'token' && isAddress(formData.tokenAddress)
+    }
+  })
+
+  // Update token symbol when fetched
+  useEffect(() => {
+    if (fetchedTokenSymbol) {
+      setTokenSymbol(String(fetchedTokenSymbol))
+    } else {
+      setTokenSymbol('')
+    }
+  }, [fetchedTokenSymbol])
 
   // Smart contract has been fixed! 
   // Factory now transfers tokens directly from user to the created Hackathon contract
@@ -250,6 +278,7 @@ export default function CreateHackathon() {
     }
 
     // Check judges
+    const judgeAddresses = new Set<string>()
     for (let i = 0; i < judges.length; i++) {
       const judge = judges[i]
       if (!judge.address || !judge.name || !judge.tokens) {
@@ -261,6 +290,14 @@ export default function CreateHackathon() {
         setValidationError(`Invalid address for judge ${i + 1}`)
         return false
       }
+
+      // Check for duplicate addresses
+      const normalizedAddress = judge.address.toLowerCase()
+      if (judgeAddresses.has(normalizedAddress)) {
+        setValidationError(`Duplicate judge address found. Each judge must have a unique wallet address.`)
+        return false
+      }
+      judgeAddresses.add(normalizedAddress)
 
       const tokens = parseInt(judge.tokens)
       if (isNaN(tokens) || tokens <= 0) {
@@ -399,34 +436,31 @@ export default function CreateHackathon() {
         <form onSubmit={handleSubmit} className="space-y-8">
           {/* Basic Information */}
           <Card className="border-0 shadow-lg bg-white backdrop-blur-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-gray-800">
-                <Sparkles className="w-5 h-5 text-amber-600" />
-                Basic Information
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent className="space-y-6 pt-6">
               {/* Hackathon Name */}
               <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="name" className="text-gray-700 font-medium">Hackathon Name *</Label>
-                  <button
-                    type="button"
-                    onClick={() => toggleInfo('name')}
-                    className="text-amber-600 hover:text-amber-700"
-                  >
-                    <Info className="w-4 h-4" />
-                  </button>
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 min-w-[200px]">
+                    <Sparkles className="w-4 h-4 text-amber-600" />
+                    <Label htmlFor="name" className="text-gray-700 font-medium">Hackathon Name *</Label>
+                    <button
+                      type="button"
+                      onClick={() => toggleInfo('name')}
+                      className="text-amber-600 hover:text-amber-700"
+                    >
+                      <Info className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="Enter hackathon name"
+                    className="border-amber-200 focus:border-amber-500 bg-white text-gray-900 placeholder:text-gray-500 flex-1"
+                  />
                 </div>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Enter hackathon name"
-                  className="border-amber-200 focus:border-amber-500 bg-white text-gray-900 placeholder:text-gray-500"
-                />
                 {showInfo.name && (
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-gray-600 ml-[212px]">
                     Choose a unique and descriptive name for your hackathon
                   </p>
                 )}
@@ -437,8 +471,8 @@ export default function CreateHackathon() {
               {/* Date and Time */}
               <div className="space-y-4">
                 {/* Timezone Toggle */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 min-w-[200px]">
                     <Globe className="w-4 h-4 text-purple-600" />
                     <Label className="text-gray-700 font-medium">Timezone</Label>
                     <button
@@ -477,7 +511,7 @@ export default function CreateHackathon() {
                   </div>
                 </div>
                 {showInfo.timezone && (
-                  <p className="text-sm text-gray-600 mb-4">
+                  <p className="text-sm text-gray-600 mb-4 ml-[212px]">
                     Choose how you want to input times. Local time will be converted to UTC for storage on the blockchain.
                     All times are ultimately stored and displayed in UTC format.
                   </p>
@@ -487,68 +521,64 @@ export default function CreateHackathon() {
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-blue-500" />
-                      <Label className="text-gray-700 font-medium">
-                        Start Date & Time * ({timezoneMode === 'local' ? 'Local Time' : 'UTC'})
-                      </Label>
+                      <Label className="text-gray-700 font-medium">Start Date & Time *</Label>
                     </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                      className="border-blue-200 focus:border-blue-500 bg-white text-gray-900"
-                      style={{
-                        colorScheme: 'light'
-                      }}
-                    />
-                    <Input
-                      type="time"
-                      value={formData.startTime}
-                      onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                      className="border-blue-200 focus:border-blue-500 bg-white text-gray-900"
-                      style={{
-                        colorScheme: 'light'
-                      }}
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="date"
+                        value={formData.startDate}
+                        onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                        className="border-blue-200 focus:border-blue-500 bg-white text-gray-900 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        style={{
+                          colorScheme: 'light'
+                        }}
+                      />
+                      <Input
+                        type="time"
+                        value={formData.startTime}
+                        onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                        className="border-blue-200 focus:border-blue-500 bg-white text-gray-900 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        style={{
+                          colorScheme: 'light'
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-red-500" />
-                    <Label className="text-gray-700 font-medium">
-                      End Date & Time * ({timezoneMode === 'local' ? 'Local Time' : 'UTC'})
-                    </Label>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      type="date"
-                      value={formData.endDate}
-                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                      className="border-red-200 focus:border-red-500 bg-white text-gray-900"
-                      style={{
-                        colorScheme: 'light'
-                      }}
-                    />
-                    <Input
-                      type="time"
-                      value={formData.endTime}
-                      onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                      className="border-red-200 focus:border-red-500 bg-white text-gray-900"
-                      style={{
-                        colorScheme: 'light'
-                      }}
-                    />
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-red-500" />
+                      <Label className="text-gray-700 font-medium">End Date & Time *</Label>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input
+                        type="date"
+                        value={formData.endDate}
+                        onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                        className="border-red-200 focus:border-red-500 bg-white text-gray-900 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        style={{
+                          colorScheme: 'light'
+                        }}
+                      />
+                      <Input
+                        type="time"
+                        value={formData.endTime}
+                        onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                        className="border-red-200 focus:border-red-500 bg-white text-gray-900 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        style={{
+                          colorScheme: 'light'
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
               </div>
 
               {/* Prize Pool */}
               <div className="space-y-4">
                 {/* Prize Pool Type Toggle */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 min-w-[200px]">
                     <Trophy className="w-4 h-4 text-yellow-500" />
                     <Label className="text-gray-700 font-medium">Prize Pool Type</Label>
                     <button
@@ -588,49 +618,98 @@ export default function CreateHackathon() {
                   </div>
                 </div>
                 {showInfo.prizePoolType && (
-                  <p className="text-sm text-gray-600 mb-4">
-                    Choose whether to fund the prize pool with native ETH (sent with transaction) or with an ERC-20 token (requires approval). 
-                    Token-based hackathons are now fully supported!
+                  <p className="text-sm text-gray-600 mb-4 ml-[212px]">
+                    Choose whether to fund the prize pool with native ETH or with an ERC20 token.
                   </p>
                 )}
 
-
-
-                {/* Token Address Input (only show when token is selected) */}
+                {/* Token Fields - Parallel Layout */}
                 {prizePoolType === 'token' && (
-                  <div className="space-y-2">
-                    <Label htmlFor="tokenAddress" className="text-gray-700 font-medium">Token Contract Address *</Label>
-                    <Input
-                      id="tokenAddress"
-                      value={formData.tokenAddress}
-                      onChange={(e) => setFormData({ ...formData, tokenAddress: e.target.value })}
-                      placeholder="0x..."
-                      className="font-mono text-sm border-yellow-200 focus:border-yellow-500 bg-white text-gray-900 placeholder:text-gray-500"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Token Address */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 min-w-[180px]">
+                          <Coins className="w-4 h-4 text-purple-500" />
+                          <Label htmlFor="tokenAddress" className="text-gray-700 font-medium">Token Contract Address *</Label>
+                        </div>
+                      </div>
+                      <Input
+                        id="tokenAddress"
+                        value={formData.tokenAddress}
+                        onChange={(e) => setFormData({ ...formData, tokenAddress: e.target.value })}
+                        placeholder="0x..."
+                        className="font-mono text-sm border-yellow-200 focus:border-yellow-500 bg-white text-gray-900 placeholder:text-gray-500"
+                      />
+                    </div>
+
+                    {/* Prize Pool Amount */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 min-w-[180px]">
+                          <Trophy className="w-4 h-4 text-yellow-600" />
+                          <Label htmlFor="prizePool" className="text-gray-700 font-medium">
+                            Prize Pool Amount ({tokenSymbol || 'Tokens'}) *
+                          </Label>
+                          <button
+                            type="button"
+                            onClick={() => toggleInfo('prizePool')}
+                            className="text-amber-600 hover:text-amber-700"
+                          >
+                            <Info className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                      <Input
+                        id="prizePool"
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={formData.prizePool}
+                        onChange={(e) => setFormData({ ...formData, prizePool: e.target.value })}
+                        placeholder={`Enter amount in ${tokenSymbol || 'tokens'}`}
+                        className="border-yellow-200 focus:border-yellow-500 bg-white text-gray-900 placeholder:text-gray-500"
+                      />
+                    </div>
                   </div>
                 )}
 
-                {/* Prize Pool Amount */}
-                <div className="space-y-2">
-                  <Label htmlFor="prizePool" className="text-gray-700 font-medium">
-                    Prize Pool Amount ({prizePoolType === 'eth' ? 'ETH' : 'Tokens'}) *
-                  </Label>
-                  <Input
-                    id="prizePool"
-                    type="number"
-                    step="any"
-                    min="0"
-                    value={formData.prizePool}
-                    onChange={(e) => setFormData({ ...formData, prizePool: e.target.value })}
-                    placeholder={`Enter prize pool amount in ${prizePoolType === 'eth' ? 'ETH' : 'tokens'}`}
-                    className="border-yellow-200 focus:border-yellow-500 bg-white text-gray-900 placeholder:text-gray-500"
-                  />
-                  {showInfo.prizePool && (
-                    <p className="text-sm text-gray-600">
-                      The total prize pool that will be distributed to winners based on voting results
-                    </p>
-                  )}
-                </div>
+                {/* ETH Prize Pool Amount (when ETH is selected) */}
+                {prizePoolType === 'eth' && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 min-w-[200px]">
+                        <Trophy className="w-4 h-4 text-yellow-600" />
+                        <Label htmlFor="prizePool" className="text-gray-700 font-medium">
+                          Prize Pool Amount (ETH) *
+                        </Label>
+                        <button
+                          type="button"
+                          onClick={() => toggleInfo('prizePool')}
+                          className="text-amber-600 hover:text-amber-700"
+                        >
+                          <Info className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <Input
+                        id="prizePool"
+                        type="number"
+                        step="any"
+                        min="0"
+                        value={formData.prizePool}
+                        onChange={(e) => setFormData({ ...formData, prizePool: e.target.value })}
+                        placeholder="Enter prize pool amount in ETH"
+                        className="border-yellow-200 focus:border-yellow-500 bg-white text-gray-900 placeholder:text-gray-500 flex-1"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {showInfo.prizePool && (
+                  <p className="text-sm text-gray-600 ml-[212px]">
+                    The total prize pool that will be distributed to winners based on voting results
+                  </p>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -683,7 +762,10 @@ export default function CreateHackathon() {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2">
-                        <Label className="text-gray-700 font-medium">Wallet Address *</Label>
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-blue-500" />
+                          <Label className="text-gray-700 font-medium">Wallet Address *</Label>
+                        </div>
                         <Input
                           value={judge.address}
                           onChange={(e) => updateJudge(index, 'address', e.target.value)}
@@ -692,7 +774,10 @@ export default function CreateHackathon() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-gray-700 font-medium">Judge Name *</Label>
+                        <div className="flex items-center gap-2">
+                          <Users className="w-4 h-4 text-green-500" />
+                          <Label className="text-gray-700 font-medium">Judge Name *</Label>
+                        </div>
                         <Input
                           value={judge.name}
                           onChange={(e) => updateJudge(index, 'name', e.target.value)}
@@ -701,7 +786,10 @@ export default function CreateHackathon() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label className="text-gray-700 font-medium">Voting Tokens *</Label>
+                        <div className="flex items-center gap-2">
+                          <Coins className="w-4 h-4 text-orange-500" />
+                          <Label className="text-gray-700 font-medium">Voting Tokens *</Label>
+                        </div>
                         <Input
                           type="number"
                           min="1"
