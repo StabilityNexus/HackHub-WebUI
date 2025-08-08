@@ -595,7 +595,7 @@ export default function ExplorerPage() {
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">
-                {hackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'active').length}
+                {hackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'accepting-submissions').length}
               </div>
               <div className="text-sm text-muted-foreground">Active Now</div>
             </div>
