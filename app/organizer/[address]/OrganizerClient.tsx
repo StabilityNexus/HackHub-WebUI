@@ -442,11 +442,11 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
                           <div className="w-full bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative">
                             {/* Gradient background overlay based on status */}
                             <div className={`absolute inset-0 transition-all duration-300 ${
-                              status === 'active' 
+                              status === 'accepting-submissions' 
                                 ? 'bg-gradient-to-r from-amber-50/60 via-orange-50/30 to-amber-50/60 group-hover:from-amber-100/60 group-hover:via-orange-100/30 group-hover:to-amber-100/60'
                                 : status === 'upcoming' 
                                 ? 'bg-gradient-to-r from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
-                                : status === 'ended'
+                                : status === 'judging-submissions'
                                 ? 'bg-gradient-to-r from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
                                 : 'bg-gradient-to-r from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
                             }`}></div>
@@ -522,7 +522,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
                             <div className={`absolute inset-0 transition-all duration-300 ${
                               status === 'upcoming' 
                                 ? 'bg-gradient-to-r from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
-                                : status === 'ended'
+                                : status === 'judging-submissions'
                                 ? 'bg-gradient-to-r from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
                                 : 'bg-gradient-to-r from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
                             }`}></div>
@@ -536,7 +536,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
                                   </h3>
                                   <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
                                     {status === 'upcoming' && '⏰'} 
-                                    {status === 'ended' && '⏹️'} 
+                                    {status === 'judging-submissions' && '⏹️'} 
                                     {status === 'concluded' && '✅'} 
                                     {status.toUpperCase()}
                                   </Badge>

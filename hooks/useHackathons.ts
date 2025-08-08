@@ -55,10 +55,10 @@ export const getDaysRemaining = (endTime: number): number => {
   return Math.floor(getTimeRemaining(endTime) / 86400)
 }
 
-export const getHackathonStatus = (startTime: number, endTime: number, concluded: boolean): 'upcoming' | 'active' | 'ended' | 'concluded' => {
+export const getHackathonStatus = (startTime: number, endTime: number, concluded: boolean): 'upcoming' | 'accepting-submissions' | 'judging-submissions' | 'concluded' => {
   if (concluded) return 'concluded'
   const now = getCurrentUTCTimestamp()
   if (now < startTime) return 'upcoming'
-  if (now > endTime) return 'ended'
-  return 'active'
+  if (now > endTime) return 'judging-submissions'
+  return 'accepting-submissions'
 } 

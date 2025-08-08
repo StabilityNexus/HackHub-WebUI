@@ -75,9 +75,9 @@ export default function ExplorerPage() {
   // Get status badge color
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800 border-green-200'
+      case 'accepting-submissions': return 'bg-green-100 text-green-800 border-green-200'
       case 'upcoming': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'ended': return 'bg-orange-100 text-orange-800 border-orange-200'
+      case 'judging-submissions': return 'bg-orange-100 text-orange-800 border-orange-200'
       case 'concluded': return 'bg-gray-100 text-gray-800 border-gray-200'
       default: return 'bg-gray-100 text-gray-800 border-gray-200'
     }
@@ -240,18 +240,18 @@ export default function ExplorerPage() {
     let matchesStatus = true
     if (statusFilter !== "All Status") {
       const status = getHackathonStatus(hackathon.startTime, hackathon.endTime, hackathon.concluded)
-      matchesStatus = statusFilter.toLowerCase() === status
+      matchesStatus = statusFilter === status
     }
     
     return matchesSearch && matchesStatus
   })
 
-  // Sort hackathons by status priority (active first, then upcoming, then ended/concluded)
+  // Sort hackathons by status priority (accepting-submissions first, then upcoming, then judging-submissions/concluded)
   const sortedHackathons = filteredHackathons.sort((a, b) => {
     const statusA = getHackathonStatus(a.startTime, a.endTime, a.concluded)
     const statusB = getHackathonStatus(b.startTime, b.endTime, b.concluded)
     
-    const statusPriority = { 'active': 0, 'upcoming': 1, 'ended': 2, 'concluded': 3 }
+    const statusPriority = { 'accepting-submissions': 0, 'upcoming': 1, 'judging-submissions': 2, 'concluded': 3 }
     return statusPriority[statusA] - statusPriority[statusB]
   })
 
@@ -356,9 +356,9 @@ export default function ExplorerPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="All Status">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
+              <SelectItem value="accepting-submissions">Accepting Submissions</SelectItem>
               <SelectItem value="upcoming">Upcoming</SelectItem>
-              <SelectItem value="ended">Ended</SelectItem>
+              <SelectItem value="judging-submissions">Judging Submissions</SelectItem>
               <SelectItem value="concluded">Concluded</SelectItem>
             </SelectContent>
           </Select>
@@ -367,15 +367,15 @@ export default function ExplorerPage() {
 
       {/* Hackathons List */}
       <div className="space-y-8">
-        {/* Ongoing Hackathons */}
-        {sortedHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'active').length > 0 && (
+        {/* Active Hackathons */}
+        {sortedHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'accepting-submissions').length > 0 && (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-amber-800 border-b border-amber-200 pb-2">
-              🔥 Ongoing Hackathons
+              🔥 Active Hackathons
             </h2>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {sortedHackathons
-                .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'active')
+                .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'accepting-submissions')
                 .map((hackathon) => {
                   const status = getHackathonStatus(hackathon.startTime, hackathon.endTime, hackathon.concluded)
                   return (
@@ -384,56 +384,65 @@ export default function ExplorerPage() {
                       href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}
                       className="block"
                     >
-                                              <div className="w-full bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative">
+                      <div className="bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative h-full">
                         {/* Gradient background overlay based on status */}
                         <div className={`absolute inset-0 transition-all duration-300 ${
-                          status === 'active' 
-                            ? 'bg-gradient-to-r from-amber-50/60 via-orange-50/30 to-amber-50/60 group-hover:from-amber-100/60 group-hover:via-orange-100/30 group-hover:to-amber-100/60'
+                          status === 'accepting-submissions' 
+                            ? 'bg-gradient-to-b from-amber-50/60 via-orange-50/30 to-amber-50/60 group-hover:from-amber-100/60 group-hover:via-orange-100/30 group-hover:to-amber-100/60'
                             : status === 'upcoming' 
-                            ? 'bg-gradient-to-r from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
-                            : status === 'ended'
-                            ? 'bg-gradient-to-r from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
-                            : 'bg-gradient-to-r from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
+                            ? 'bg-gradient-to-b from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
+                            : status === 'judging-submissions'
+                            ? 'bg-gradient-to-b from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
+                            : 'bg-gradient-to-b from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
                         }`}></div>
                         
-                        <div className="relative z-10 flex items-center justify-between p-6 min-h-[140px]">
-                          {/* Left section - Name and Status */}
-                          <div className="flex items-center gap-4 flex-1">
-                            <div className="space-y-2">
-                              <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-700 transition-colors">
-                                {hackathon.hackathonName}
-                              </h3>
-                              <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
-                                🔥 {status.toUpperCase()}
-                              </Badge>
-                            </div>
-                          </div>
-
-                          {/* Center section - Block Image */}
-                          <div className="flex-shrink-0 mx-8 relative h-full flex items-center">
-                            <div className="h-32 w-32 relative group-hover:scale-105 transition-transform duration-300">
+                        <div className="relative z-10 p-6 flex flex-col h-full">
+                          {/* Top section - Image */}
+                          <div className="flex justify-center mb-4">
+                            <div className="h-20 w-20 relative group-hover:scale-105 transition-transform duration-300">
                               <Image
                                 src={getImagePath("/block.png")}
                                 alt="Blockchain Block"
-                                width={128}
-                                height={128}
+                                width={80}
+                                height={80}
                                 className="h-full w-full object-contain"
                                 priority
                               />
                             </div>
                           </div>
 
-                          {/* Right section - Date and Prize */}
-                          <div className="flex flex-col items-end gap-2 flex-1">
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <Calendar className="w-4 h-4" />
-                              <span className="text-sm font-medium">
-                                {formatDate(hackathon.startTime)} - {formatDate(hackathon.endTime)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                          {/* Title */}
+                          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-700 transition-colors text-center mb-3 line-clamp-2">
+                            {hackathon.hackathonName}
+                          </h3>
+
+                          {/* Status Badge */}
+                          <div className="flex justify-center mb-4">
+                            <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
+                              🔥 {status === 'accepting-submissions' ? 'ACCEPTING SUBMISSIONS' : 
+                                   status === 'judging-submissions' ? 'JUDGING SUBMISSIONS' :
+                                   status === 'upcoming' ? 'UPCOMING' : 'CONCLUDED'}
+                            </Badge>
+                          </div>
+
+                          {/* Date */}
+                          <div className="flex items-center justify-center gap-2 text-gray-600 mb-3">
+                            <Calendar className="w-4 h-4" />
+                            <span className="text-xs font-medium text-center">
+                              {formatDate(hackathon.startTime)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-center gap-2 text-gray-600 mb-4">
+                            <span className="text-xs font-medium text-center">
+                              to {formatDate(hackathon.endTime)}
+                            </span>
+                          </div>
+
+                          {/* Prize - Push to bottom */}
+                          <div className="mt-auto">
+                            <div className="flex items-center justify-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-2 rounded-full border border-amber-200">
                               <DollarSign className="w-4 h-4" />
-                              <span>{formatPrizeAmount(hackathon)}</span>
+                              <span className="text-sm">{formatPrizeAmount(hackathon)}</span>
                             </div>
                           </div>
                         </div>
@@ -446,14 +455,14 @@ export default function ExplorerPage() {
         )}
 
         {/* Other Hackathons */}
-        {sortedHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'active').length > 0 && (
+        {sortedHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'accepting-submissions').length > 0 && (
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-gray-700 border-b border-gray-200 pb-2">
               Upcoming & Past Hackathons
             </h2>
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {sortedHackathons
-                .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'active')
+                .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'accepting-submissions')
                 .map((hackathon) => {
                   const status = getHackathonStatus(hackathon.startTime, hackathon.endTime, hackathon.concluded)
                   return (
@@ -462,57 +471,66 @@ export default function ExplorerPage() {
                       href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}
                       className="block"
                     >
-                      <div className="w-full bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative">
+                      <div className="bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative h-full">
                         {/* Gradient background overlay based on status */}
                         <div className={`absolute inset-0 transition-all duration-300 ${
                           status === 'upcoming' 
-                            ? 'bg-gradient-to-r from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
-                            : status === 'ended'
-                            ? 'bg-gradient-to-r from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
-                            : 'bg-gradient-to-r from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
+                            ? 'bg-gradient-to-b from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
+                            : status === 'judging-submissions'
+                            ? 'bg-gradient-to-b from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
+                            : 'bg-gradient-to-b from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
                         }`}></div>
                         
-                        <div className="relative z-10 flex items-center justify-between p-6 min-h-[140px]">
-                          {/* Left section - Name and Status */}
-                          <div className="flex items-center gap-4 flex-1">
-                            <div className="space-y-2">
-                              <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-700 transition-colors">
-                                {hackathon.hackathonName}
-                              </h3>
-                              <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
-                                {status === 'upcoming' && '⏰'} 
-                                {status === 'ended' && '⏹️'} 
-                                {status === 'concluded' && '✅'} 
-                                {status.toUpperCase()}
-                              </Badge>
-                            </div>
-                          </div>
-
-                          {/* Center section - Block Image */}
-                          <div className="flex-shrink-0 mx-8 relative h-full flex items-center">
-                            <div className="h-32 w-32 relative group-hover:scale-105 transition-transform duration-300">
+                        <div className="relative z-10 p-6 flex flex-col h-full">
+                          {/* Top section - Image */}
+                          <div className="flex justify-center mb-4">
+                            <div className="h-20 w-20 relative group-hover:scale-105 transition-transform duration-300">
                               <Image
                                 src={getImagePath("/block.png")}
                                 alt="Blockchain Block"
-                                width={128}
-                                height={128}
+                                width={80}
+                                height={80}
                                 className="h-full w-full object-contain"
                                 priority
                               />
                             </div>
                           </div>
 
-                          {/* Right section - Date and Prize */}
-                          <div className="flex flex-col items-end gap-2 flex-1">
-                            <div className="flex items-center gap-2 text-gray-600">
-                              <Calendar className="w-4 h-4" />
-                              <span className="text-sm font-medium">
-                                {formatDate(hackathon.startTime)} - {formatDate(hackathon.endTime)}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                          {/* Title */}
+                          <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-700 transition-colors text-center mb-3 line-clamp-2">
+                            {hackathon.hackathonName}
+                          </h3>
+
+                          {/* Status Badge */}
+                          <div className="flex justify-center mb-4">
+                            <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
+                              {status === 'upcoming' && '⏰'} 
+                              {status === 'judging-submissions' && '⚖️'} 
+                              {status === 'concluded' && '✅'} 
+                              {status === 'accepting-submissions' ? 'ACCEPTING SUBMISSIONS' : 
+                               status === 'judging-submissions' ? 'JUDGING SUBMISSIONS' :
+                               status === 'upcoming' ? 'UPCOMING' : 'CONCLUDED'}
+                            </Badge>
+                          </div>
+
+                          {/* Date */}
+                          <div className="flex items-center justify-center gap-2 text-gray-600 mb-3">
+                            <Calendar className="w-4 h-4" />
+                            <span className="text-xs font-medium text-center">
+                              {formatDate(hackathon.startTime)}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-center gap-2 text-gray-600 mb-4">
+                            <span className="text-xs font-medium text-center">
+                              to {formatDate(hackathon.endTime)}
+                            </span>
+                          </div>
+
+                          {/* Prize - Push to bottom */}
+                          <div className="mt-auto">
+                            <div className="flex items-center justify-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-2 rounded-full border border-amber-200">
                               <DollarSign className="w-4 h-4" />
-                              <span>{formatPrizeAmount(hackathon)}</span>
+                              <span className="text-sm">{formatPrizeAmount(hackathon)}</span>
                             </div>
                           </div>
                         </div>
