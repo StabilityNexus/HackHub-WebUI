@@ -267,7 +267,7 @@ export default function HomePage() {
         <div className="flex justify-center lg:justify-end pt-0">
           <div className="relative -mt-8">
             <img 
-              src={getImagePath("/hackhub.png")} 
+              src={getImagePath("/handRevolution.png")} 
               alt="HackHub - Think, Build, Innovate" 
               className="w-full max-w-md h-auto object-contain drop-shadow-2xl"
             />
@@ -278,25 +278,7 @@ export default function HomePage() {
       {/* Revolution Section with Hackathons Carousel */}
       <div className="py-16">
         <div className="container mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-            {/* Left side - Revolution Image */}
-            <div className="flex justify-center lg:justify-start">
-              <div className="relative">
-                {/* Decorative background elements */}
-                <div className="absolute -top-1 -left-8 w-32 h-32 bg-gradient-to-br from-amber-200 to-orange-200 rounded-full opacity-30 animate-pulse"></div>
-                
-                <div className="relative z-10">
-                  <img 
-                    src={getImagePath("/handRevolution.png")} 
-                    alt="Be Part of the Revolution" 
-                    className="w-full max-w-sm h-auto object-contain drop-shadow-2xl transform hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-              </div>
-            </div>
-            
-            {/* Right side - Revolution Text and Hackathons - Takes 2 columns */}
-            <div className="space-y-8 lg:col-span-2 ml-8">
+          <div className="space-y-8">
               {/* Revolution Text - Moved Higher */}
               <div className="relative -mt-8">
                 {/* Small decorative elements */}
@@ -420,7 +402,6 @@ export default function HomePage() {
                   </div>
                 </div>
               )}
-            </div>
           </div>
         </div>
       </div>
