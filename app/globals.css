@@ -133,6 +133,10 @@ body {
     @apply bg-background text-foreground;
   }
   
+  html {
+    scroll-behavior: smooth;
+  }
+  
   /* Make date and time input icons more visible */
   input[type="date"]::-webkit-calendar-picker-indicator,
   input[type="time"]::-webkit-calendar-picker-indicator {

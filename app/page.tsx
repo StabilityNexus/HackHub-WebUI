@@ -26,7 +26,8 @@ import {
   Globe,
   Coins,
   Calendar,
-  DollarSign
+  DollarSign,
+  ChevronDown
 } from "lucide-react"
 import { formatUTCTimestamp } from '@/utils/timeUtils'
 
@@ -226,53 +227,61 @@ export default function HomePage() {
 
 
   return (
-    <div className="space-y-12">
-      {/* Hero Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center py-12">
-        {/* Left side - Welcome to HackHub */}
-        <div className="space-y-8">
-          <div className="relative">
-            {/* Decorative elements */}
-            <div className="absolute -top-4 -left-4 w-16 h-16 bg-gradient-to-br from-amber-200 to-orange-200 rounded-full opacity-60 animate-pulse"></div>
-            <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-gradient-to-br from-orange-300 to-amber-300 rounded-full opacity-40"></div>
+    <div className="min-h-screen">
+      {/* Hero Section - Full Viewport Height */}
+      <div className="min-h-screen flex items-center justify-center relative">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            {/* Left side - Welcome to HackHub */}
+            <div className="space-y-8">
+              <div className="relative">            
+                {/* Main heading with enhanced styling */}
+                <div className="relative z-10">
+                  <h1 className="text-6xl lg:text-7xl font-black leading-tight">
+                    <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 drop-shadow-sm">
+                    Welcome to the Hub for
+                    </span>
+                    <span className="block text-6xl lg:text-8xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-orange-600 to-amber-800 mt-4 tracking-tight">
+                      On-Chain Hackathons.
+                    </span>
+                  </h1>
+                  
+                  {/* Accent line */}
+                   <div className="mt-6 w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg"></div>
+                   
+                   <div className="mt-8">
+                     <p className="text-xl lg:text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-600 tracking-wider">
+                     Transparent. Permissionless. Easy.
+                     </p>
+                   </div>
+                </div>
+              </div>
+            </div>
             
-            {/* Main heading with enhanced styling */}
-            <div className="relative z-10">
-              <h1 className="text-6xl lg:text-7xl font-black leading-tight">
-                <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 drop-shadow-sm">
-                Welcome to the Hub for
-                </span>
-                <span className="block text-6xl lg:text-8xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-orange-600 to-amber-800 mt-4 tracking-tight">
-                  On-Chain Hackathons.
-                </span>
-              </h1>
-              
-                             {/* Accent line */}
-               <div className="mt-6 w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg"></div>
-               
-               <div className="mt-8">
-                 <p className="text-xl lg:text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-600 tracking-wider">
-                 Transparent. Permissionless. Easy.
-                 </p>
-               </div>
-             </div>
-           </div>
-         </div>
+            {/* Right side - HackHub image */}
+            <div className="flex justify-center lg:justify-end pt-0">
+              <div className="relative -mt-8">
+                <img 
+                  src={getImagePath("/handRevolution.png")} 
+                  alt="HackHub - Think, Build, Innovate" 
+                  className="w-full max-w-md h-auto object-contain drop-shadow-2xl"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
         
-        {/* Right side - HackHub image */}
-        <div className="flex justify-center lg:justify-end pt-0">
-          <div className="relative -mt-8">
-            <img 
-              src={getImagePath("/handRevolution.png")} 
-              alt="HackHub - Think, Build, Innovate" 
-              className="w-full max-w-md h-auto object-contain drop-shadow-2xl"
-            />
+        {/* Scroll Indicator */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+          <div className="flex flex-col items-center space-y-2">
+            <span className="text-sm text-amber-600 font-medium">Scroll to explore</span>
+            <ChevronDown className="w-6 h-6 text-amber-600" />
           </div>
         </div>
       </div>
 
       {/* Revolution Section with Hackathons Carousel */}
-      <div className="py-16">
+      <div className="min-h-screen py-16">
         <div className="container mx-auto">
           <div className="space-y-8">
               {/* Revolution Text - Moved Higher */}
