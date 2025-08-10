@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 
 import { Label } from "@/components/ui/label"
@@ -22,23 +21,15 @@ const getImagePath = (path: string) => {
 import { HackathonData, getHackathonStatus, getDaysRemaining, Judge, Project } from "@/hooks/useHackathons"
 import { getPublicClient } from "@wagmi/core"
 import { config } from "@/utils/config"
-import { getFactoryAddress } from "@/utils/contractAddress"
-import { HACKHUB_FACTORY_ABI } from "@/utils/contractABI/HackHubFactory"
 import { HACKHUB_ABI } from "@/utils/contractABI/HackHub"
 import { formatEther } from "viem"
 import { 
   Trophy, 
   Users, 
-  Clock, 
-  Award, 
   Target, 
   Calendar,
-  ExternalLink,
   Vote,
   Gavel,
-  Code,
-  FileText,
-  Coins,
   Loader2,
   AlertCircle,
   RefreshCw,

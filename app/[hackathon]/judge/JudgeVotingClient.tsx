@@ -4,46 +4,26 @@ import { useState, useEffect } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { HackathonData, getHackathonStatus, getDaysRemaining, Judge, Project } from "@/hooks/useHackathons"
 import { getPublicClient } from "@wagmi/core"
 import { config } from "@/utils/config"
-import { getFactoryAddress } from "@/utils/contractAddress"
-import { HACKHUB_FACTORY_ABI } from "@/utils/contractABI/HackHubFactory"
 import { HACKHUB_ABI } from "@/utils/contractABI/HackHub"
 import { formatEther } from "viem"
 import { 
-  Trophy, 
-  Users, 
-  Clock, 
-  Award, 
   Target, 
-  Calendar,
   ExternalLink,
-  Share2,
   Vote,
-  Gavel,
   Code,
+  ArrowLeft,
+  RefreshCw,
+  Gavel,
   FileText,
-  Coins,
-  CheckCircle,
-  XCircle,
   Loader2,
   AlertCircle,
-  RefreshCw,
-  Wifi,
-  WifiOff,
-  Plus,
-  Minus,
-  Eye,
-  History,
-  ArrowLeft
 } from "lucide-react"
 import { useChainId, useAccount, useWriteContract } from "wagmi"
 import { toast } from "sonner"
@@ -66,8 +46,6 @@ export default function JudgeVotingClient() {
   const [error, setError] = useState<string | null>(null)
   const [voting, setVoting] = useState(false)
 
-  const [isERC20Prize, setIsERC20Prize] = useState(false)
-  const [prizeTokenSymbol, setPrizeTokenSymbol] = useState<string>("")
   const [modalOpen, setModalOpen] = useState(false)
   const [modalLink, setModalLink] = useState({ url: '', type: '' })
   
@@ -166,8 +144,6 @@ export default function JudgeVotingClient() {
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'prizeToken' }) as Promise<string>,
       ])
 
-      // Set prize type
-      setIsERC20Prize(isERC20)
 
       // Get token symbol if it's an ERC20 prize
       let tokenSymbol = ""
@@ -183,7 +159,6 @@ export default function JudgeVotingClient() {
           tokenSymbol = "TOKEN"
         }
       }
-      setPrizeTokenSymbol(tokenSymbol)
 
       // Fetch judges
       const judges: Judge[] = []

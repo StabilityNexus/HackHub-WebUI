@@ -6,11 +6,9 @@ import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId,
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, Plus, Trash2, Calendar, Clock, Users, Trophy, Sparkles, Info, Globe, Coins, CheckCircle, Eye, DollarSign } from 'lucide-react'
 import { HACKHUB_FACTORY_ABI } from '@/utils/contractABI/HackHubFactory'
 import { IERC20MinimalABI } from '@/utils/contractABI/Interfaces'
@@ -21,7 +19,6 @@ import {
   convertUTCToTimestamp, 
   timestampToContractDate, 
   isInFuture, 
-  getCurrentUTCTimestamp,
   type TimezoneMode 
 } from '@/utils/timeUtils'
 

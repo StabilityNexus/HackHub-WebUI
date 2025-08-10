@@ -146,6 +146,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
             factory,
             judgeCount,
             projectCount,
+            imageURL,
           ] = await Promise.all([
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'owner' }) as Promise<string>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'name' }) as Promise<string>,
@@ -159,6 +160,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'factory' }) as Promise<string>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'judgeCount' }) as Promise<bigint>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'projectCount' }) as Promise<bigint>,
+            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'imageURL' }) as Promise<string>,
           ])
           
           if (owner.toLowerCase() === organizerAddress.toLowerCase()) {
@@ -179,7 +181,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
               projectCount: Number(projectCount),
               judges: [],
               projects: [],
-              image: "/placeholder.svg?height=200&width=400",
+              image: imageURL || getImagePath("/block.png"),
             }
             organizerHackathons.push(hackathon)
           }
@@ -235,7 +237,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
           <Button 
             variant="outline" 
             onClick={() => router.back()}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
@@ -259,7 +261,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
           <Button 
             variant="outline" 
             onClick={() => router.back()}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
@@ -298,7 +300,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
           <Button 
             variant="outline" 
             onClick={() => router.back()}
-            className="flex items-center gap-2"
+            className="flex items-center gap-2 border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
           >
             <ArrowLeft className="w-4 h-4" />
             Back
@@ -361,22 +363,25 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
 
   return (
     <div className="space-y-8">
-      {/* Header with back button */}
-      <div className="flex items-center gap-4 mb-6">
+      {/* Header with back button and title in line */}
+      <div className="flex items-center justify-between mb-6">
         <Button 
           variant="outline" 
           onClick={() => router.back()}
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </Button>
-      </div>
-      
-      <div className="text-center space-y-4">
+        
         <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
           Organizer's Events
         </h1>
+        
+        <div className="w-20"></div> {/* Spacer to center the title */}
+      </div>
+      
+      <div className="text-center space-y-4">
         <div className="flex items-center justify-center gap-2 text-muted-foreground">
           <User className="w-5 h-5" />
           <span className="font-mono text-sm">
@@ -428,7 +433,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
                 <h2 className="text-2xl font-bold text-amber-800 border-b border-amber-200 pb-2">
                   🔥 Ongoing Hackathons
                 </h2>
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {sortedHackathons
                     .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'accepting-submissions')
                     .map((hackathon) => {
@@ -439,56 +444,70 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
                           href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}
                           className="block"
                         >
-                          <div className="w-full bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative">
+                          <div className="bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative h-full">
                             {/* Gradient background overlay based on status */}
                             <div className={`absolute inset-0 transition-all duration-300 ${
                               status === 'accepting-submissions' 
-                                ? 'bg-gradient-to-r from-amber-50/60 via-orange-50/30 to-amber-50/60 group-hover:from-amber-100/60 group-hover:via-orange-100/30 group-hover:to-amber-100/60'
+                                ? 'bg-gradient-to-b from-amber-50/60 via-orange-50/30 to-amber-50/60 group-hover:from-amber-100/60 group-hover:via-orange-100/30 group-hover:to-amber-100/60'
                                 : status === 'upcoming' 
-                                ? 'bg-gradient-to-r from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
+                                ? 'bg-gradient-to-b from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
                                 : status === 'judging-submissions'
-                                ? 'bg-gradient-to-r from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
-                                : 'bg-gradient-to-r from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
+                                ? 'bg-gradient-to-b from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
+                                : 'bg-gradient-to-b from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
                             }`}></div>
                             
-                            <div className="relative z-10 flex items-center justify-between p-6 min-h-[140px]">
-                              {/* Left section - Name and Status */}
-                              <div className="flex items-center gap-4 flex-1">
-                                <div className="space-y-2">
-                                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-700 transition-colors">
-                                    {hackathon.hackathonName}
-                                  </h3>
-                                  <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
-                                    🔥 {status.toUpperCase()}
-                                  </Badge>
-                                </div>
-                              </div>
-
-                              {/* Center section - Block Image */}
-                              <div className="flex-shrink-0 mx-8 relative h-full flex items-center">
-                                <div className="h-32 w-32 relative group-hover:scale-105 transition-transform duration-300">
+                            <div className="relative z-10 p-6 flex flex-col h-full">
+                              {/* Top section - Image */}
+                              <div className="flex justify-center mb-4">
+                                <div className="h-20 w-20 relative group-hover:scale-105 transition-transform duration-300">
                                   <Image
-                                    src={getImagePath("/block.png")}
-                                    alt="Blockchain Block"
-                                    width={128}
-                                    height={128}
-                                    className="h-full w-full object-contain"
+                                    src={hackathon.image || getImagePath("/block.png")}
+                                    alt="Hackathon Image"
+                                    width={80}
+                                    height={80}
+                                    className="h-full w-full object-contain rounded-lg"
                                     priority
+                                    onError={(e) => {
+                                      // Fallback to block.png if custom image fails to load
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = getImagePath("/block.png");
+                                    }}
                                   />
                                 </div>
                               </div>
 
-                              {/* Right section - Date and Prize */}
-                              <div className="flex flex-col items-end gap-2 flex-1">
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <Calendar className="w-4 h-4" />
-                                  <span className="text-sm font-medium">
-                                    {formatDate(hackathon.startTime)} - {formatDate(hackathon.endTime)}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                              {/* Title */}
+                              <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-700 transition-colors text-center mb-3 line-clamp-2">
+                                {hackathon.hackathonName}
+                              </h3>
+
+                              {/* Status Badge */}
+                              <div className="flex justify-center mb-4">
+                                <Badge className={`text-xs font-medium px-3 py-1 bg-orange-100 text-orange-800 border-orange-200 shadow-sm`}>
+                                  🔥 {status === 'accepting-submissions' ? 'ACCEPTING SUBMISSIONS' : 
+                                       status === 'judging-submissions' ? 'JUDGING SUBMISSIONS' :
+                                       status === 'upcoming' ? 'UPCOMING' : 'CONCLUDED'}
+                                </Badge>
+                              </div>
+
+                              {/* Date */}
+                              <div className="flex items-center justify-center gap-2 text-gray-600 mb-3">
+                                <Calendar className="w-4 h-4" />
+                                <span className="text-xs font-medium text-center">
+                                  {formatDate(hackathon.startTime)}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-center gap-2 text-gray-600 mb-4">
+                                <span className="text-xs font-medium text-center">
+                                  to {formatDate(hackathon.endTime)}
+                                </span>
+                              </div>
+
+                              {/* Prize - Push to bottom */}
+                              <div className="mt-auto">
+                                <div className="flex items-center justify-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-2 rounded-full border border-amber-200">
                                   <DollarSign className="w-4 h-4" />
-                                  <span>{parseFloat(hackathon.prizePool).toFixed(2)} ETH</span>
+                                  <span className="text-sm">{parseFloat(hackathon.prizePool).toFixed(2)} ETH</span>
                                 </div>
                               </div>
                             </div>
@@ -506,7 +525,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
                 <h2 className="text-2xl font-bold text-gray-700 border-b border-gray-200 pb-2">
                   Upcoming & Past Hackathons
                 </h2>
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {sortedHackathons
                     .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'accepting-submissions')
                     .map((hackathon) => {
@@ -517,57 +536,67 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
                           href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}
                           className="block"
                         >
-                          <div className="w-full bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative">
+                          <div className="bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative h-full">
                             {/* Gradient background overlay based on status */}
                             <div className={`absolute inset-0 transition-all duration-300 ${
                               status === 'upcoming' 
-                                ? 'bg-gradient-to-r from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
+                                ? 'bg-gradient-to-b from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
                                 : status === 'judging-submissions'
-                                ? 'bg-gradient-to-r from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
-                                : 'bg-gradient-to-r from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
+                                ? 'bg-gradient-to-b from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
+                                : 'bg-gradient-to-b from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
                             }`}></div>
                             
-                            <div className="relative z-10 flex items-center justify-between p-6 min-h-[140px]">
-                              {/* Left section - Name and Status */}
-                              <div className="flex items-center gap-4 flex-1">
-                                <div className="space-y-2">
-                                  <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-700 transition-colors">
-                                    {hackathon.hackathonName}
-                                  </h3>
-                                  <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
-                                    {status === 'upcoming' && '⏰'} 
-                                    {status === 'judging-submissions' && '⏹️'} 
-                                    {status === 'concluded' && '✅'} 
-                                    {status.toUpperCase()}
-                                  </Badge>
-                                </div>
-                              </div>
-
-                              {/* Center section - Block Image */}
-                              <div className="flex-shrink-0 mx-8 relative h-full flex items-center">
-                                <div className="h-32 w-32 relative group-hover:scale-105 transition-transform duration-300">
+                            <div className="relative z-10 p-6 flex flex-col h-full">
+                              {/* Top section - Image */}
+                              <div className="flex justify-center mb-4">
+                                <div className="h-20 w-20 relative group-hover:scale-105 transition-transform duration-300">
                                   <Image
-                                    src={getImagePath("/block.png")}
-                                    alt="Blockchain Block"
-                                    width={128}
-                                    height={128}
-                                    className="h-full w-full object-contain"
+                                    src={hackathon.image || getImagePath("/block.png")}
+                                    alt="Hackathon Image"
+                                    width={80}
+                                    height={80}
+                                    className="h-full w-full object-contain rounded-lg"
                                     priority
+                                    onError={(e) => {
+                                      // Fallback to block.png if custom image fails to load
+                                      const target = e.target as HTMLImageElement;
+                                      target.src = getImagePath("/block.png");
+                                    }}
                                   />
                                 </div>
                               </div>
 
-                              {/* Right section - Date and Prize */}
-                              <div className="flex flex-col items-end gap-2 flex-1">
-                                <div className="flex items-center gap-2 text-gray-600">
-                                  <Calendar className="w-4 h-4" />
-                                  <span className="text-sm font-medium">
-                                    {formatDate(hackathon.startTime)} - {formatDate(hackathon.endTime)}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-1 rounded-full border border-amber-200">
+                              {/* Title */}
+                              <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-700 transition-colors text-center mb-3 line-clamp-2">
+                                {hackathon.hackathonName}
+                              </h3>
+
+                              {/* Status Badge */}
+                              <div className="flex justify-center mb-4">
+                                <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
+                                  {status === 'upcoming' ? 'UPCOMING' : 
+                                   status === 'judging-submissions' ? 'JUDGING SUBMISSIONS' : 'CONCLUDED'}
+                                </Badge>
+                              </div>
+
+                              {/* Date */}
+                              <div className="flex items-center justify-center gap-2 text-gray-600 mb-3">
+                                <Calendar className="w-4 h-4" />
+                                <span className="text-xs font-medium text-center">
+                                  {formatDate(hackathon.startTime)}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-center gap-2 text-gray-600 mb-4">
+                                <span className="text-xs font-medium text-center">
+                                  to {formatDate(hackathon.endTime)}
+                                </span>
+                              </div>
+
+                              {/* Prize - Push to bottom */}
+                              <div className="mt-auto">
+                                <div className="flex items-center justify-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-2 rounded-full border border-amber-200">
                                   <DollarSign className="w-4 h-4" />
-                                  <span>{parseFloat(hackathon.prizePool).toFixed(2)} ETH</span>
+                                  <span className="text-sm">{parseFloat(hackathon.prizePool).toFixed(2)} ETH</span>
                                 </div>
                               </div>
                             </div>
@@ -579,28 +608,6 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
               </div>
             )}
           </div>
-
-          {/* No Results */}
-          {sortedHackathons.length === 0 && hackathons.length > 0 && (
-            <div className="text-center py-12">
-              <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-                <Search className="w-8 h-8 text-gray-400" />
-              </div>
-              <h3 className="text-lg font-semibold mb-2">No hackathons found</h3>
-              <p className="text-muted-foreground mb-4">
-                Try adjusting your search terms or status filter
-              </p>
-              <Button 
-                onClick={() => {
-                  setSearchTerm("")
-                  setStatusFilter("All Status")
-                }}
-                className="bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white"
-              >
-                Show All Events
-              </Button>
-            </div>
-          )}
         </>
       )}
 
