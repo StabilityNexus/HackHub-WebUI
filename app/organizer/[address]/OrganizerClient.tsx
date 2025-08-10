@@ -411,9 +411,9 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="All Status">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
                   <SelectItem value="upcoming">Upcoming</SelectItem>
-                  <SelectItem value="ended">Ended</SelectItem>
+                  <SelectItem value="accepting-submissions">Accepting Submissions</SelectItem>
+                  <SelectItem value="judging-submissions">Judging Submissions</SelectItem>
                   <SelectItem value="concluded">Concluded</SelectItem>
                 </SelectContent>
               </Select>

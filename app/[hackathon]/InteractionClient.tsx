@@ -43,7 +43,8 @@ import {
   AlertCircle,
   RefreshCw,
   Eye,
-  History
+  History,
+  Settings
 } from "lucide-react"
 import { useChainId, useAccount, useWriteContract } from "wagmi"
 import { toast } from "sonner"
@@ -71,6 +72,7 @@ export default function InteractionClient() {
   const [submitting, setSubmitting] = useState(false)
   
   // Form state
+  const [projectName, setProjectName] = useState("")
   const [sourceCode, setSourceCode] = useState("")
   const [documentation, setDocumentation] = useState("")
   const [prizeRecipient, setPrizeRecipient] = useState("")
@@ -109,6 +111,9 @@ export default function InteractionClient() {
   const userJudge = hackathonData?.judges.find(j => 
     j.address.toLowerCase() === (userAddress || '').toLowerCase()
   )
+
+  // Check if user is the organizer
+  const isUserOrganizer = hackathonData?.organizer.toLowerCase() === (userAddress || '').toLowerCase()
 
   // Helper function to format prize amounts
   const formatPrizeAmount = (amount: string | number) => {
@@ -149,6 +154,7 @@ export default function InteractionClient() {
         projectCount,
         isERC20,
         prizeToken,
+        imageURL,
       ] = await Promise.all([
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'name' }) as Promise<string>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'startDate' }) as Promise<string>,
@@ -164,6 +170,7 @@ export default function InteractionClient() {
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'projectCount' }) as Promise<bigint>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'isERC20Prize' }) as Promise<boolean>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'prizeToken' }) as Promise<string>,
+        publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'imageURL' }) as Promise<string>,
       ])
 
       // Set prize type
@@ -189,20 +196,12 @@ export default function InteractionClient() {
       const judges: Judge[] = []
       if (Number(judgeCount) > 0) {
         try {
-          const [judgeAddresses, judgeNames] = await Promise.all([
-            publicClient.readContract({ 
-              address: contractAddress, 
-              abi: HACKHUB_ABI, 
-              functionName: 'getJudges',
-              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
-            }) as Promise<string[]>,
-            publicClient.readContract({ 
-              address: contractAddress, 
-              abi: HACKHUB_ABI, 
-              functionName: 'getJudgeNames',
-              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
-            }) as Promise<string[]>
-          ])
+          const judgeAddresses = await publicClient.readContract({ 
+            address: contractAddress, 
+            abi: HACKHUB_ABI, 
+            functionName: 'getJudges',
+            args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+          }) as string[]
 
           for (let i = 0; i < judgeAddresses.length; i++) {
             try {
@@ -224,7 +223,7 @@ export default function InteractionClient() {
 
               judges.push({
                 address: judgeAddresses[i],
-                name: judgeNames[i],
+                name: `Judge ${i + 1}`, // Use generic name since names are no longer stored
                 tokensAllocated: Number(judgeTokens),
                 tokensRemaining: Number(remainingTokens)
               })
@@ -248,7 +247,7 @@ export default function InteractionClient() {
                 abi: HACKHUB_ABI,
                 functionName: 'projects',
                 args: [BigInt(i)]
-              }) as Promise<[string, string, string, string]>, // [submitter, recipient, sourceCode, docs]
+              }) as Promise<[string, string, string, string, string]>, // [submitter, recipient, sourceCode, docs]
               publicClient.readContract({
                 address: contractAddress,
                 abi: HACKHUB_ABI,
@@ -274,9 +273,10 @@ export default function InteractionClient() {
             projects.push({
               id: i,
               submitter: projectInfo[0],
-              prizeRecipient: projectInfo[1],
-              sourceCode: projectInfo[2],
-              documentation: projectInfo[3],
+              recipient: projectInfo[1],
+              name: projectInfo[2],
+              sourceCode: projectInfo[3],
+              docs: projectInfo[4],
               tokensReceived: Number(projectTokens),
               estimatedPrize: prizeAmount,
               formattedPrize: isERC20Prize && tokenSymbol ? `${prizeAmount.toFixed(4)} ${tokenSymbol}` : `${prizeAmount.toFixed(4)} ETH`,
@@ -307,7 +307,7 @@ export default function InteractionClient() {
         projectCount: Number(projectCount),
         judges,
         projects,
-        image: "/placeholder.svg?height=300&width=1200",
+        image: imageURL || getImagePath("/block.png"),
       }
 
       setHackathonData(hackathon)
@@ -321,8 +321,8 @@ export default function InteractionClient() {
 
   // Submit or edit project
   const handleSubmitProject = async () => {
-    if (!sourceCode.trim() || !documentation.trim()) {
-      toast.error("Please provide both source code and documentation links")
+    if (!projectName.trim() || !sourceCode.trim() || !documentation.trim()) {
+      toast.error("Please provide project name, source code, and documentation links")
       return
     }
 
@@ -347,7 +347,7 @@ export default function InteractionClient() {
           address: contractAddress,
           abi: HACKHUB_ABI,
           functionName: 'submitProject',
-          args: [sourceCode.trim(), documentation.trim(), recipient as `0x${string}`],
+          args: [projectName.trim(), sourceCode.trim(), documentation.trim(), recipient as `0x${string}`],
         })
         toast.success("Project updated successfully!")
       } else {
@@ -355,12 +355,13 @@ export default function InteractionClient() {
           address: contractAddress,
           abi: HACKHUB_ABI,
           functionName: 'submitProject',
-          args: [sourceCode.trim(), documentation.trim(), recipient as `0x${string}`],
+          args: [projectName.trim(), sourceCode.trim(), documentation.trim(), recipient as `0x${string}`],
         })
         toast.success("Project submitted successfully!")
       }
 
       setSubmissionOpen(false)
+      setProjectName("")
       setSourceCode("")
       setDocumentation("")
       setPrizeRecipient("")
@@ -381,11 +382,16 @@ export default function InteractionClient() {
 
   // Handle edit project
   const handleEditProject = () => {
+    const userProject = hackathonData?.projects.find(p => 
+      p.submitter.toLowerCase() === (userAddress || '').toLowerCase()
+    )
+    
     if (!userProject) return
     
+    setProjectName(userProject.name || '')
     setSourceCode(userProject.sourceCode)
-    setDocumentation(userProject.documentation)
-    setPrizeRecipient(userProject.prizeRecipient === userAddress ? "" : userProject.prizeRecipient)
+    setDocumentation(userProject.docs)
+    setPrizeRecipient(userProject.recipient === userAddress ? "" : userProject.recipient)
     setIsEditing(true)
     setSubmissionOpen(true)
   }
@@ -512,9 +518,14 @@ export default function InteractionClient() {
         {/* Background Image */}
         <div className="absolute inset-0">
           <img 
-            src={getImagePath("/hacka-thon.jpg")}
+            src={hackathonData.image}
             alt="Hackathon Background"
-            className="w-full h-80 object-cover"
+            className="w-full h-80 object-cover object-right"
+            onError={(e) => {
+              // Fallback to hacka-thon.jpg if custom image fails to load
+              const target = e.target as HTMLImageElement;
+              target.src = getImagePath("/hacka-thon.jpg");
+            }}
           />
           {/* Gradient Overlay for better text readability */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
@@ -560,9 +571,23 @@ export default function InteractionClient() {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
           {/* About This Hackathon */}
-          <Card className="border bg-white shadow-sm">
+          <Card className="border bg-white border-gray-300 shadow-sm">
             <CardHeader>
-              <CardTitle className="text-black">About This Hackathon</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-black">About This Hackathon</CardTitle>
+                {isUserOrganizer && (
+                  <Link href={`/manage?hackAddr=${hackAddr}&chainId=${urlChainId}`}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Manage
+                    </Button>
+                  </Link>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <p className="text-muted-foreground text-black leading-relaxed mb-4">
@@ -576,16 +601,16 @@ export default function InteractionClient() {
                   <p className="text-md font-bold text-gray-800 text-muted-foreground">Total Voting Tokens</p>
                 </div>
                 <div className="text-center p-4 bg-gray-50 rounded-lg border" >
-                  <Coins className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
-                  <p className="text-2xl font-bold" style={{color: '#8B6914'}}>{formatPrizeAmount(hackathonData.prizePool)}</p>
-                  <p className="text-md font-bold text-gray-800 text-muted-foreground">Prize Pool</p>
+                  <Users className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
+                  <p className="text-2xl font-bold" style={{color: '#8B6914'}}>{hackathonData.judgeCount}</p>
+                  <p className="text-md font-bold text-gray-800 text-muted-foreground">Judges</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Timeline */}
-          <Card className="border shadow-sm bg-white">
+          <Card className="border shadow-sm border-gray-300 bg-white">
             <CardHeader>
               <CardTitle className="flex items-center text-black gap-2">
                 <Calendar className="w-5 h-5" style={{color: '#8B6914'}} />
@@ -626,7 +651,7 @@ export default function InteractionClient() {
           </Card>
 
           {/* Judges Section */}
-          <Card className="border bg-white shadow-sm">
+          <Card className="border bg-white border-gray-300 shadow-sm">
             <CardHeader>
               <CardTitle className="flex items-center text-black gap-2">
                 <Gavel className="w-5 h-5" style={{color: '#8B6914'}} />
@@ -675,7 +700,7 @@ export default function InteractionClient() {
         {/* Sidebar */}
         <div className="space-y-6">
           {/* Quick Stats - Enhanced */}
-          <Card className="border bg-white shadow-sm">
+          <Card className="border bg-white border-gray-300 shadow-sm">
             <CardHeader>
               <CardTitle className="text-black">Quick Stats</CardTitle>
             </CardHeader>
@@ -696,10 +721,6 @@ export default function InteractionClient() {
                   {hackathonData.organizer.slice(0, 6)}...{hackathonData.organizer.slice(-4)}
                 </span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-gray-800">Projects</span>
-                <span className="font-semibold text-gray-800">{hackathonData.projectCount}</span>
-              </div>
               
               {/* Organizer Past Events Button */}
               <div className="pt-2">
@@ -719,11 +740,11 @@ export default function InteractionClient() {
 
           {/* Judge Voting Interface */}
           {isUserJudge && (
-            <Card className="border shadow-sm border-black bg-white">
+            <Card className="border shadow-sm border-gray-300 bg-white">
               <CardContent className="p-6">
                 <div className="text-center space-y-4">
                   <Gavel className="w-12 h-12 mx-auto" style={{color: '#8B6914'}} />
-                  <h3 className="font-bold text-lg text-gray-800">Judge Panel</h3>
+                  <h3 className="font-bold text-lg text-gray-800">Judge Dashboard</h3>
                   <p className="text-sm text-muted-foreground text-gray-800">
                     You have {userJudge?.tokensRemaining} voting tokens remaining
                   </p>
@@ -732,11 +753,11 @@ export default function InteractionClient() {
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      className="w-full bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none mt-4 border-amber-300"
+                      className="w-full bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none mt-4 border-gray-300"
                       disabled={!hackathonData.projects.length}
                     >
                       <Eye className="w-4 h-4 mr-2" />
-                      Open Judge Panel
+                      Judge Submitted Projects
                     </Button>
                   </Link>
                 </div>
@@ -746,7 +767,7 @@ export default function InteractionClient() {
 
           {/* Project Submission */}
           {status === 'accepting-submissions' && (
-            <Card className="border shadow-sm border-black bg-white">
+            <Card className="border shadow-sm border-gray-300 bg-white">
               <CardContent className="p-6">
                 <div className="text-center space-y-4">
                   <Target className="w-12 h-12 mx-auto" style={{color: '#8B6914'}} />
@@ -754,6 +775,7 @@ export default function InteractionClient() {
                   {userProject ? (
                     <div className="space-y-3">
                       <p className="text-sm text-green-600 text-gray-800">✓ You have already submitted a project!</p>
+                      <p className="text-sm text-green-600 text-gray-800">To submit another project, please connect with another wallet address</p>
                       <p className="text-xs text-muted-foreground text-gray-800">
                         Project #{userProject.id} - {userProject.tokensReceived} votes received
                       </p>
@@ -769,6 +791,8 @@ export default function InteractionClient() {
                       <Button 
                         className="w-full border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
                         disabled={!isConnected}
+                        variant="outline" 
+                        size="sm"
                         onClick={() => {
                           if (userProject) {
                             handleEditProject()
@@ -794,6 +818,15 @@ export default function InteractionClient() {
                         </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="projectName">Project Name</Label>
+                          <Input
+                            id="projectName"
+                            placeholder="Enter your project name"
+                            value={projectName}
+                            onChange={(e) => setProjectName(e.target.value)}
+                          />
+                        </div>
                         <div className="space-y-2">
                           <Label htmlFor="sourceCode">Source Code URL</Label>
                           <Input

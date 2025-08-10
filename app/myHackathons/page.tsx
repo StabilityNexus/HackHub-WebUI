@@ -160,20 +160,12 @@ export default function MyHackathonsPage() {
       const judges = []
       if (Number(judgeCount) > 0) {
         try {
-          const [judgeAddresses, judgeNames] = await Promise.all([
-            publicClient.readContract({ 
-              address: addr, 
-              abi: HACKHUB_ABI, 
-              functionName: 'getJudges',
-              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
-            }) as Promise<string[]>,
-            publicClient.readContract({ 
-              address: addr, 
-              abi: HACKHUB_ABI, 
-              functionName: 'getJudgeNames',
-              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
-            }) as Promise<string[]>
-          ])
+          const judgeAddresses = await publicClient.readContract({ 
+            address: addr, 
+            abi: HACKHUB_ABI, 
+            functionName: 'getJudges',
+            args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+          }) as string[]
 
           for (let i = 0; i < judgeAddresses.length; i++) {
             try {
@@ -194,7 +186,7 @@ export default function MyHackathonsPage() {
 
               judges.push({
                 address: judgeAddresses[i],
-                name: judgeNames[i],
+                name: `Judge ${i + 1}`, // Use generic name since names are no longer stored
                 tokensAllocated: Number(judgeTokens),
                 tokensRemaining: Number(remainingTokens)
               })
@@ -225,7 +217,7 @@ export default function MyHackathonsPage() {
                 abi: HACKHUB_ABI,
                 functionName: 'projects',
                 args: [userProjectId]
-              }) as Promise<[string, string, string, string]>, // [submitter, recipient, sourceCode, docs]
+              }) as Promise<[string, string, string, string, string]>, // [submitter, recipient, sourceCode, docs]
               publicClient.readContract({
                 address: addr,
                 abi: HACKHUB_ABI,
@@ -249,9 +241,10 @@ export default function MyHackathonsPage() {
             projects.push({
               id: Number(userProjectId),
               submitter: projectInfo[0],
-              prizeRecipient: projectInfo[1],
-              sourceCode: projectInfo[2],
-              documentation: projectInfo[3],
+              recipient: projectInfo[1],
+              name: projectInfo[2],
+              sourceCode: projectInfo[3],
+              docs: projectInfo[4],
               tokensReceived: Number(projectTokens),
               estimatedPrize: Number(formatEther(projectPrize)),
               prizeClaimed
@@ -313,68 +306,7 @@ export default function MyHackathonsPage() {
         return
       }
 
-      // Get counts for each category using the optimized getUserCounts function
-      const [
-        participantOngoingCount,
-        participantPastCount,
-        judgeOngoingCount,
-        judgePastCount
-      ] = await publicClient.readContract({
-        address: factoryAddress,
-        abi: HACKHUB_FACTORY_ABI,
-        functionName: 'getUserCounts',
-        args: [userAddress],
-      }) as [bigint, bigint, bigint, bigint]
-
-      // Fetch participating hackathons
-      let participantAddresses: `0x${string}`[] = []
-      const totalParticipating = Number(participantOngoingCount) + Number(participantPastCount)
-      
-      if (Number(participantOngoingCount) > 0) {
-        const ongoingParticipant = await publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getParticipantHackathons',
-          args: [userAddress, BigInt(0), BigInt(Number(participantOngoingCount) - 1), true],
-        }) as `0x${string}`[]
-        participantAddresses = participantAddresses.concat(ongoingParticipant)
-      }
-
-      if (Number(participantPastCount) > 0) {
-        const pastParticipant = await publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getParticipantHackathons',
-          args: [userAddress, BigInt(0), BigInt(Number(participantPastCount) - 1), false],
-        }) as `0x${string}`[]
-        participantAddresses = participantAddresses.concat(pastParticipant)
-      }
-
-      // Fetch judging hackathons
-      let judgeAddresses: `0x${string}`[] = []
-      const totalJudging = Number(judgeOngoingCount) + Number(judgePastCount)
-
-      if (Number(judgeOngoingCount) > 0) {
-        const ongoingJudge = await publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getJudgeHackathons',
-          args: [userAddress, BigInt(0), BigInt(Number(judgeOngoingCount) - 1), true],
-        }) as `0x${string}`[]
-        judgeAddresses = judgeAddresses.concat(ongoingJudge)
-      }
-
-      if (Number(judgePastCount) > 0) {
-        const pastJudge = await publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getJudgeHackathons',
-          args: [userAddress, BigInt(0), BigInt(Number(judgePastCount) - 1), false],
-        }) as `0x${string}`[]
-        judgeAddresses = judgeAddresses.concat(pastJudge)
-      }
-
-      // Fetch organizing hackathons (all hackathons where user is owner)
+      // Get all hackathon addresses first
       const [ongoingCount, pastCount] = await publicClient.readContract({
         address: factoryAddress,
         abi: HACKHUB_FACTORY_ABI,
@@ -403,10 +335,46 @@ export default function MyHackathonsPage() {
         allAddresses = allAddresses.concat(pastAddrs)
       }
 
-      // Filter organizing hackathons by owner
+      // Filter hackathons by user's role
+      const participantAddresses: `0x${string}`[] = []
+      const judgeAddresses: `0x${string}`[] = []
       const organizingAddresses: `0x${string}`[] = []
+
       for (const addr of allAddresses) {
         try {
+          // Check if user is a participant
+          try {
+            const participantProjectId = await publicClient.readContract({
+              address: addr,
+              abi: HACKHUB_ABI,
+              functionName: 'participantProjectId',
+              args: [userAddress]
+            }) as bigint
+
+            if (participantProjectId !== undefined && Number(participantProjectId) > 0) {
+              participantAddresses.push(addr)
+            }
+          } catch (err) {
+            // User is not a participant in this hackathon
+          }
+
+          // Check if user is a judge
+          try {
+            const judgeTokens = await publicClient.readContract({
+              address: addr,
+              abi: HACKHUB_ABI,
+              functionName: 'judgeTokens',
+              args: [userAddress]
+            }) as bigint
+
+            if (judgeTokens !== undefined && Number(judgeTokens) > 0) {
+              judgeAddresses.push(addr)
+            }
+          } catch (err) {
+            // User is not a judge in this hackathon
+          }
+
+          // Check if user is the organizer
           const owner = await publicClient.readContract({
             address: addr,
             abi: HACKHUB_ABI,
@@ -417,9 +385,11 @@ export default function MyHackathonsPage() {
             organizingAddresses.push(addr)
           }
         } catch (err) {
-          console.error(`Error checking owner for ${addr}:`, err)
+          console.error(`Error checking user role for ${addr}:`, err)
         }
       }
+
+
 
       // Fetch detailed data for all hackathons
       const [participatingData, judgingData, organizingData] = await Promise.all([
@@ -480,22 +450,22 @@ export default function MyHackathonsPage() {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-2">
-                <Trophy className="w-4 h-4 text-yellow-600" />
-                <span className="font-semibold text-yellow-700">{formatPrizeAmount(hackathon)}</span>
+                <Trophy className="w-4 h-4 text-[#8B6914]" />
+                <span className="font-semibold text-[#8B6914]">{formatPrizeAmount(hackathon)}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Vote className="w-4 h-4" style={{color: '#8B6914'}} />
+                <Vote className="w-4 h-4 text-[#8B6914]" />
                 <span className="text-sm text-gray-600">{userProject.tokensReceived} votes</span>
               </div>
               <div className="flex items-center gap-2">
-                <Coins className="w-4 h-4 text-green-600" />
+                <Coins className="w-4 h-4 text-[#8B6914]" />
                 <span className="text-sm text-gray-600">
                   {userProject.formattedPrize ? userProject.formattedPrize : `${userProject.estimatedPrize.toFixed(4)} ${hackathon.prizeTokenSymbol || 'ETH'}`} estimated
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 {userProject.prizeClaimed ? (
-                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  <CheckCircle className="w-4 h-4 text-[#8B6914]" />
                 ) : (
                   <XCircle className="w-4 h-4 text-gray-400" />
                 )}
@@ -507,12 +477,12 @@ export default function MyHackathonsPage() {
 
             <div className="bg-yellow-50 p-3 rounded-lg border">
               <p className="text-sm font-semibold mb-1 text-gray-800">Your Project #{userProject.id}</p>
-              <p className="text-sm text-gray-600">{userProject.documentation}</p>
+              <p className="text-sm text-gray-600">{userProject.docs}</p>
             </div>
             
             <div className="flex items-center justify-between pt-2">
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-blue-500" />
+                <Calendar className="w-4 h-4 text-[#8B6914]" />
                 <span className="text-sm text-gray-600">
                   {status === 'accepting-submissions' ? `${getDaysRemaining(hackathon.endTime)} days left` : 
                    status === 'upcoming' ? 'Not started' : 
@@ -579,21 +549,21 @@ export default function MyHackathonsPage() {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-2">
-                <Trophy className="w-4 h-4 text-yellow-600" />
-                <span className="font-semibold text-yellow-700">{formatPrizeAmount(hackathon)}</span>
+                <Trophy className="w-4 h-4 text-[#8B6914]" />
+                <span className="font-semibold text-[#8B6914]">{formatPrizeAmount(hackathon)}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Code className="w-4 h-4 text-blue-500" />
+                <Code className="w-4 h-4 text-[#8B6914]" />
                 <span className="text-sm text-gray-600">{hackathon.projectCount} projects</span>
               </div>
               <div className="flex items-center gap-2">
-                <Vote className="w-4 h-4" style={{color: '#8B6914'}} />
+                <Vote className="w-4 h-4 text-[#8B6914]" />
                 <span className="text-sm text-gray-600">
                   {userJudge.tokensRemaining} / {userJudge.tokensAllocated} tokens left
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Gavel className="w-4 h-4 text-green-600" />
+                <Gavel className="w-4 h-4 text-[#8B6914]" />
                 <span className="text-sm text-gray-600">Judge: {userJudge.name}</span>
               </div>
             </div>
@@ -608,7 +578,7 @@ export default function MyHackathonsPage() {
             
             <div className="flex items-center justify-between pt-2">
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-blue-500" />
+                <Calendar className="w-4 h-4 text-[#8B6914]" />
                 <span className="text-sm text-gray-600">
                   {status === 'accepting-submissions' ? `${getDaysRemaining(hackathon.endTime)} days left to submit` : 
                    status === 'upcoming' ? 'Not started' : 
@@ -625,7 +595,7 @@ export default function MyHackathonsPage() {
                   </Link>
                 )}
                 <Link href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}>
-                  <Button size="sm" variant="outline" className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-amber-400">
+                  <Button size="sm" variant="outline" className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none">
                     View Details
                   </Button>
                 </Link>
@@ -656,19 +626,19 @@ export default function MyHackathonsPage() {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="flex items-center gap-2">
-                <Trophy className="w-4 h-4 text-yellow-600" />
-                <span className="font-semibold text-yellow-700">{formatPrizeAmount(hackathon)}</span>
+                <Trophy className="w-4 h-4 text-[#8B6914]" />
+                <span className="font-semibold text-[#8B6914]">{formatPrizeAmount(hackathon)}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Code className="w-4 h-4 text-blue-500" />
+                <Code className="w-4 h-4 text-[#8B6914]" />
                 <span className="text-sm text-gray-600">{hackathon.projectCount} projects</span>
               </div>
               <div className="flex items-center gap-2">
-                <Gavel className="w-4 h-4" style={{color: '#8B6914'}} />
+                <Gavel className="w-4 h-4 text-[#8B6914]" />
                 <span className="text-sm text-gray-600">{hackathon.judgeCount} judges</span>
               </div>
               <div className="flex items-center gap-2">
-                <Vote className="w-4 h-4 text-green-600" />
+                <Vote className="w-4 h-4 text-[#8B6914]" />
                 <span className="text-sm text-gray-600">{hackathon.totalTokens} total tokens</span>
               </div>
             </div>
@@ -687,7 +657,7 @@ export default function MyHackathonsPage() {
             
             <div className="flex items-center justify-between pt-2">
               <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-blue-500" />
+                <Calendar className="w-4 h-4 text-[#8B6914]" />
                 <span className="text-sm text-gray-600">
                   {status === 'accepting-submissions' ? `${getDaysRemaining(hackathon.endTime)} days left` : 
                    status === 'upcoming' ? 'Not started' : 
@@ -704,7 +674,7 @@ export default function MyHackathonsPage() {
                   </Link>
                 )}
                 <Link href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}>
-                  <Button size="sm" variant="outline" className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-amber-400">
+                  <Button size="sm" variant="outline" className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none">
                     View Details
                   </Button>
                 </Link>
@@ -723,7 +693,6 @@ export default function MyHackathonsPage() {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
             My Hackathons
           </h1>
-          <p className="text-muted-foreground text-lg text-gray-600">Track your hackathon participation, judging, and organizing activities</p>
         </div>
         
         <div className="flex items-center justify-center py-12">
@@ -746,7 +715,6 @@ export default function MyHackathonsPage() {
           <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
             My Hackathons
           </h1>
-          <p className="text-muted-foreground text-lg text-gray-600">Track your hackathon participation, judging, and organizing activities</p>
           
           {/* Network Status */}
           <div className="flex items-center justify-center gap-2 text-sm text-gray-600">
@@ -788,7 +756,7 @@ export default function MyHackathonsPage() {
                 onClick={loadUserHackathons}
                 className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-100"
               >
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="w-4 h-4 text-red-700" />
                 Retry
               </Button>
             </div>
@@ -806,7 +774,6 @@ export default function MyHackathonsPage() {
         <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
           My Hackathons
         </h1>
-        <p className="text-muted-foreground text-lg text-gray-600">Track your hackathon participation, judging, and organizing activities</p>
       </div>
 
       {/* Tabs */}
@@ -845,9 +812,9 @@ export default function MyHackathonsPage() {
       {currentHackathons.length === 0 && (
         <div className="text-center py-12">
           <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
-            {activeTab === "participating" && <Target className="w-8 h-8 text-amber-600" />}
-            {activeTab === "judging" && <Gavel className="w-8 h-8 text-amber-600" />}
-            {activeTab === "organizing" && <Users className="w-8 h-8 text-amber-600" />}
+            {activeTab === "participating" && <Target className="w-8 h-8 text-[#8B6914]" />}
+            {activeTab === "judging" && <Gavel className="w-8 h-8 text-[#8B6914]" />}
+            {activeTab === "organizing" && <Users className="w-8 h-8 text-[#8B6914]" />}
           </div>
           <h3 className="text-lg font-semibold mb-2 text-gray-800">No hackathons found</h3>
           <p className="text-gray-600 mb-4">

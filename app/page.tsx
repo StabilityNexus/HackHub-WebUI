@@ -60,42 +60,28 @@ export default function HomePage() {
         return
       }
 
-      // Get counts using the optimized getCounts function
-      const [ongoingCount, pastCount] = await publicClient.readContract({
+      // Get ongoing count only
+      const [ongoingCount] = await publicClient.readContract({
         address: factoryAddress,
         abi: HACKHUB_FACTORY_ABI,
         functionName: 'getCounts',
       }) as [bigint, bigint]
 
       const ongoing = Number(ongoingCount)
-      const past = Number(pastCount)
+      const maxHackathons = Math.min(ongoing, 10)
 
-      let addresses: `0x${string}`[] = []
-
-      // Get recent ongoing hackathons (last 5)
-      if (ongoing > 0) {
-        const startIndex = Math.max(0, ongoing - 5)
-        const ongoingAddrs = await publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getHackathons',
-          args: [BigInt(startIndex), BigInt(ongoing - 1), true],
-        }) as `0x${string}`[]
-        addresses = addresses.concat(ongoingAddrs)
+      if (maxHackathons === 0) {
+        setRecentHackathons([])
+        return
       }
 
-      // Get recent past hackathons (last 3)
-      if (past > 0 && addresses.length < 8) {
-        const remainingSlots = 8 - addresses.length
-        const startIndex = Math.max(0, past - remainingSlots)
-        const pastAddrs = await publicClient.readContract({
-          address: factoryAddress,
-          abi: HACKHUB_FACTORY_ABI,
-          functionName: 'getHackathons',
-          args: [BigInt(startIndex), BigInt(past - 1), false],
-        }) as `0x${string}`[]
-        addresses = addresses.concat(pastAddrs)
-      }
+      // Get ongoing hackathons from 0 to maxHackathons
+      const addresses = await publicClient.readContract({
+        address: factoryAddress,
+        abi: HACKHUB_FACTORY_ABI,
+        functionName: 'getHackathons',
+        args: [BigInt(0), BigInt(maxHackathons - 1), true],
+      }) as `0x${string}`[]
 
       if (addresses.length === 0) {
         setRecentHackathons([])
@@ -116,6 +102,7 @@ export default function HomePage() {
             concluded,
             organizer,
             projectCount,
+            imageURL,
           ] = await Promise.all([
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'name' }) as Promise<string>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startDate' }) as Promise<string>,
@@ -127,6 +114,7 @@ export default function HomePage() {
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'concluded' }) as Promise<boolean>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'owner' }) as Promise<string>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'projectCount' }) as Promise<bigint>,
+            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'imageURL' }) as Promise<string>,
           ])
 
           const hackathon: HackathonData = {
@@ -147,7 +135,7 @@ export default function HomePage() {
             judges: [],
             projects: [],
             description: `Web3 Hackathon with ${formatEther(prizePool)} ETH prize pool`,
-            image: "/placeholder.svg?height=200&width=400",
+            image: imageURL || "/placeholder.svg?height=200&width=400",
             tags: ["Web3", "Blockchain"],
           }
 
@@ -161,8 +149,8 @@ export default function HomePage() {
       const results = await Promise.all(hackathonPromises)
       const validHackathons = results.filter((h): h is HackathonData => h !== null)
 
-      // Sort by start time descending (most recent first)
-      const sortedHackathons = validHackathons.sort((a, b) => b.startTime - a.startTime)
+      // Sort by start time ascending (earliest first, since we're fetching from index 0)
+      const sortedHackathons = validHackathons.sort((a, b) => a.startTime - b.startTime)
       
       setRecentHackathons(sortedHackathons)
     } catch (err) {
@@ -203,10 +191,6 @@ export default function HomePage() {
     }
   }
 
-  // Format date helper - now using UTC in 24-hour format
-  const formatDate = (timestamp: number) => {
-    return formatUTCTimestamp(timestamp)
-  }
 
   // Get status badge color and style
   const getStatusBadge = (status: string) => {
@@ -233,7 +217,7 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             {/* Left side - Welcome to HackHub */}
-            <div className="space-y-8">
+            <div className="space-y-6">
               <div className="relative">            
                 {/* Main heading with enhanced styling */}
                 <div className="relative z-10">
@@ -368,7 +352,7 @@ export default function HomePage() {
               {/* Loading State - Right Side */}
               {loading && (
                 <div className="flex justify-center items-center h-[50vh]">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-600"></div>
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-300"></div>
                 </div>
               )}
               

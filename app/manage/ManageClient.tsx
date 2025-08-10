@@ -35,6 +35,7 @@ import {
   CheckCircle
 } from "lucide-react"
 import { useChainId, useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi"
+import { toast } from "sonner"
 import Link from "next/link"
 
 interface JudgeInfo {
@@ -51,6 +52,8 @@ interface HackathonInfo {
   projectCount: number
   concluded: boolean
   organizer: string
+  startTime: number
+  endTime: number
   isERC20Prize?: boolean
   prizeTokenSymbol?: string
 }
@@ -63,7 +66,7 @@ export default function ManageHackathonPage() {
   
   // Contract interaction
   const { writeContract, data: hash, isPending } = useWriteContract()
-  const { isLoading: isConfirming } = useWaitForTransactionReceipt({ hash })
+  const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
 
   // State
   const [hackathonInfo, setHackathonInfo] = useState<HackathonInfo | null>(null)
@@ -91,11 +94,6 @@ export default function ManageHackathonPage() {
 
       // Clear the adjustment input
       setTokenAdjustments(prev => ({ ...prev, [judgeAddress]: "" }))
-      
-      // Refresh data after a delay
-      setTimeout(() => {
-        loadHackathonData()
-      }, 2000)
       
     } catch (err: any) {
       console.error('Error adjusting judge tokens:', err)
@@ -144,11 +142,6 @@ export default function ManageHackathonPage() {
       // Clear the input
       setNewPrizeAmount("")
       
-      // Refresh data after a delay
-      setTimeout(() => {
-        loadHackathonData()
-      }, 2000)
-      
     } catch (err: any) {
       console.error('Error adjusting prize pool:', err)
       setError('Failed to adjust prize pool: ' + (err?.message || 'Unknown error'))
@@ -180,6 +173,8 @@ export default function ManageHackathonPage() {
         projectCount,
         concluded,
         organizer,
+        startTime,
+        endTime,
         isERC20Prize,
         prizeToken
       ] = await Promise.all([
@@ -190,6 +185,8 @@ export default function ManageHackathonPage() {
         publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'projectCount' }) as Promise<bigint>,
         publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'concluded' }) as Promise<boolean>,
         publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'owner' }) as Promise<string>,
+        publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'startTime' }) as Promise<bigint>,
+        publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'endTime' }) as Promise<bigint>,
         publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'isERC20Prize' }) as Promise<boolean>,
         publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'prizeToken' }) as Promise<string>
       ])
@@ -224,6 +221,8 @@ export default function ManageHackathonPage() {
         projectCount: Number(projectCount),
         concluded,
         organizer,
+        startTime: Number(startTime),
+        endTime: Number(endTime),
         isERC20Prize,
         prizeTokenSymbol: tokenSymbol
       })
@@ -232,20 +231,12 @@ export default function ManageHackathonPage() {
       const judgeList: JudgeInfo[] = []
       if (Number(judgeCount) > 0) {
         try {
-          const [judgeAddresses, judgeNames] = await Promise.all([
-            publicClient.readContract({ 
-              address: hackAddr, 
-              abi: HACKHUB_ABI, 
-              functionName: 'getJudges',
-              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
-            }) as Promise<string[]>,
-            publicClient.readContract({ 
-              address: hackAddr, 
-              abi: HACKHUB_ABI, 
-              functionName: 'getJudgeNames',
-              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
-            }) as Promise<string[]>
-          ])
+          const judgeAddresses = await publicClient.readContract({ 
+            address: hackAddr, 
+            abi: HACKHUB_ABI, 
+            functionName: 'getJudges',
+            args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+          }) as string[]
 
           for (let i = 0; i < judgeAddresses.length; i++) {
             try {
@@ -259,7 +250,7 @@ export default function ManageHackathonPage() {
 
               judgeList.push({
                 address: judgeAddresses[i],
-                name: judgeNames[i],
+                name: `Judge ${i + 1}`, // Use generic name since names are no longer stored
                 tokensAllocated: Number(judgeTokens)
               })
             } catch (judgeError) {
@@ -289,6 +280,13 @@ export default function ManageHackathonPage() {
     return `${amount} ETH`
   }
 
+  // Helper function to determine if we're in judging phase
+  const isJudgingPhase = () => {
+    if (!hackathonInfo) return false
+    const currentTime = Math.floor(Date.now() / 1000)
+    return currentTime > hackathonInfo.endTime && !hackathonInfo.concluded
+  }
+
   // Handle conclude hackathon
   const handleConcludeHackathon = async () => {
     if (!hackAddr) return
@@ -299,9 +297,9 @@ export default function ManageHackathonPage() {
         abi: HACKHUB_ABI,
         functionName: 'concludeHackathon'
       })
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error concluding hackathon:', err)
-      setError('Failed to conclude hackathon')
+      setError('Failed to conclude hackathon: ' + (err?.message || 'Unknown error'))
     }
   }
 
@@ -309,6 +307,18 @@ export default function ManageHackathonPage() {
     loadHackathonData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hackAddr, userAddress, chainId])
+
+  // Handle successful transactions
+  useEffect(() => {
+    if (isConfirmed && hash) {
+      toast.success("Transaction confirmed successfully!")
+      // Reload data after successful transaction
+      setTimeout(() => {
+        loadHackathonData()
+      }, 1000)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isConfirmed, hash])
 
   if (loading) {
     return (
@@ -352,9 +362,8 @@ export default function ManageHackathonPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
-            Manage Hackathon
+            Manage {hackathonInfo.name} Hackathon
           </h1>
-          <p className="text-muted-foreground text-gray-600">{hackathonInfo.name}</p>
         </div>
         <Link href="/myHackathons">
           <Button variant="outline" className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3]">
@@ -415,22 +424,6 @@ export default function ManageHackathonPage() {
         </Card>
       </div>
 
-      {/* Status Alert */}
-      {hackathonInfo.concluded ? (
-        <Alert className="border-green-200 bg-green-50">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-700">
-            This hackathon has been concluded. Winners can now claim their prizes.
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <Alert className="border-blue-200 bg-blue-50">
-          <Settings className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-700">
-            This hackathon is still active. You can conclude it after the submission period ends.
-          </AlertDescription>
-        </Alert>
-      )}
 
       {/* Judges Information */}
       <Card className="bg-white">
@@ -598,10 +591,17 @@ export default function ManageHackathonPage() {
               Once you conclude the hackathon, the prize distribution will be finalized based on judge votes, 
               and winners will be able to claim their prizes. This action cannot be undone.
             </p>
+            {!isJudgingPhase() && (
+              <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  The hackathon can only be concluded after the submission period ends (judging phase).
+                </p>
+              </div>
+            )}
             <Button 
               onClick={handleConcludeHackathon}
-              disabled={isPending || isConfirming}
-              className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white"
+              disabled={isPending || isConfirming || !isJudgingPhase()}
+              className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isPending || isConfirming ? (
                 <>

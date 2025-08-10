@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Plus, Trash2, Calendar, Clock, Users, Trophy, Sparkles, Info, Globe, Coins, CheckCircle } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Calendar, Clock, Users, Trophy, Sparkles, Info, Globe, Coins, CheckCircle, Eye, DollarSign } from 'lucide-react'
 import { HACKHUB_FACTORY_ABI } from '@/utils/contractABI/HackHubFactory'
 import { IERC20MinimalABI } from '@/utils/contractABI/Interfaces'
 import { HackHubFactoryAddress } from '@/utils/contractAddress'
@@ -25,9 +25,14 @@ import {
   type TimezoneMode 
 } from '@/utils/timeUtils'
 
+// Helper function to get the correct image path for GitHub Pages
+const getImagePath = (path: string) => {
+  const basePath = process.env.NODE_ENV === 'production' ? '/HackHub-WebUI' : '';
+  return `${basePath}${path}`;
+};
+
 interface Judge {
   address: string
-  name: string
   tokens: string
 }
 
@@ -43,7 +48,8 @@ export default function CreateHackathon() {
     endDate: '',
     endTime: '',
     prizePool: '',
-    tokenAddress: ''
+    tokenAddress: '',
+    imageURL: ''
   })
   
   const [timezoneMode, setTimezoneMode] = useState<TimezoneMode>('local')
@@ -51,7 +57,7 @@ export default function CreateHackathon() {
   const [tokenSymbol, setTokenSymbol] = useState<string>('')
   
   const [judges, setJudges] = useState<Judge[]>([
-    { address: '', name: '', tokens: '' }
+    { address: '', tokens: '' }
   ])
   
   const [validationError, setValidationError] = useState<string>('')
@@ -163,15 +169,15 @@ export default function CreateHackathon() {
   // Check if token approval is needed
   useEffect(() => {
     if (prizePoolType === 'token' && formData.prizePool && currentAllowance !== undefined) {
-      const requiredAmount = parseEther(formData.prizePool)
-      setNeedsApproval(currentAllowance < requiredAmount)
+      const requiamberAmount = parseEther(formData.prizePool)
+      setNeedsApproval(currentAllowance < requiamberAmount)
     } else {
       setNeedsApproval(false)
     }
   }, [prizePoolType, formData.prizePool, currentAllowance])
 
   const addJudge = () => {
-    setJudges([...judges, { address: '', name: '', tokens: '' }])
+    setJudges([...judges, { address: '', tokens: '' }])
   }
 
   const removeJudge = (index: number) => {
@@ -184,6 +190,15 @@ export default function CreateHackathon() {
     const newJudges = [...judges]
     newJudges[index] = { ...newJudges[index], [field]: value }
     setJudges(newJudges)
+  }
+
+  // Check if a judge address is duplicate
+  const isDuplicateAddress = (address: string, currentIndex: number): boolean => {
+    if (!address) return false
+    const normalizedAddress = address.toLowerCase()
+    return judges.some((judge, index) => 
+      index !== currentIndex && judge.address.toLowerCase() === normalizedAddress
+    )
   }
 
   const toggleInfo = (fieldId: string) => {
@@ -203,13 +218,13 @@ export default function CreateHackathon() {
       setValidationError('')
       setIsApprovingToken(true)
       
-      const requiredAmount = parseEther(formData.prizePool)
+      const requiamberAmount = parseEther(formData.prizePool)
       
       await writeApproval({
         address: formData.tokenAddress as `0x${string}`,
         abi: IERC20MinimalABI,
         functionName: 'approve',
-        args: [HackHubFactoryAddress[534351] as `0x${string}`, requiredAmount]
+        args: [HackHubFactoryAddress[534351] as `0x${string}`, requiamberAmount]
       })
     } catch (err) {
       console.error('Approval error:', err)
@@ -232,10 +247,10 @@ export default function CreateHackathon() {
       return false
     }
 
-    // Check required fields
+    // Check requiamber fields
     if (!formData.name || !formData.startDate || !formData.startTime || 
         !formData.endDate || !formData.endTime || !formData.prizePool) {
-      setValidationError('Please fill in all required fields')
+      setValidationError('Please fill in all requiamber fields')
       return false
     }
 
@@ -281,7 +296,7 @@ export default function CreateHackathon() {
     const judgeAddresses = new Set<string>()
     for (let i = 0; i < judges.length; i++) {
       const judge = judges[i]
-      if (!judge.address || !judge.name || !judge.tokens) {
+      if (!judge.address || !judge.tokens) {
         setValidationError(`Please fill in all fields for judge ${i + 1}`)
         return false
       }
@@ -340,7 +355,6 @@ export default function CreateHackathon() {
 
       // Prepare judge data
       const judgeAddresses = judges.map(j => j.address as `0x${string}`)
-      const judgeNames = judges.map(j => j.name)
       const tokenPerJudge = judges.map(j => BigInt(parseInt(j.tokens)))
 
       // Log the parameters being sent
@@ -352,9 +366,9 @@ export default function CreateHackathon() {
         endDate,
         judges: judgeAddresses,
         tokenPerJudge,
-        judgeNames,
         prizeToken: prizePoolType === 'eth' ? '0x0000000000000000000000000000000000000000' : formData.tokenAddress,
         prizeAmount: formData.prizePool + (prizePoolType === 'eth' ? ' ETH' : ' tokens'),
+        imageURL: formData.imageURL,
         chainId,
         factoryAddress: HackHubFactoryAddress[chainId]
       })
@@ -371,11 +385,11 @@ export default function CreateHackathon() {
           endDate,
           judgeAddresses,
           tokenPerJudge,
-          judgeNames,
           prizePoolType === 'eth' 
             ? '0x0000000000000000000000000000000000000000' as `0x${string}`
             : formData.tokenAddress as `0x${string}`,
-          parseEther(formData.prizePool)
+          parseEther(formData.prizePool),
+          formData.imageURL || ''
         ],
         value: prizePoolType === 'eth' ? parseEther(formData.prizePool) : undefined
       })
@@ -418,9 +432,9 @@ export default function CreateHackathon() {
             variant="outline"
             
             onClick={() => router.push('/explorer')}
-            className="flex items-center gap-2 border-amber-600 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
+            className="flex items-center gap-2 border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-4 h-4 text-[#8B6914]" />
             Back to Explorer
           </Button>
           
@@ -441,14 +455,14 @@ export default function CreateHackathon() {
               <div className="space-y-2">
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 min-w-[200px]">
-                    <Sparkles className="w-4 h-4 text-amber-600" />
+                    <Sparkles className="w-4 h-4 text-[#8B6914]" />
                     <Label htmlFor="name" className="text-gray-700 font-medium">Hackathon Name *</Label>
                     <button
                       type="button"
                       onClick={() => toggleInfo('name')}
                       className="text-amber-600 hover:text-amber-700"
                     >
-                      <Info className="w-4 h-4" />
+                      <Info className="w-4 h-4 text-[#8B6914]" />
                     </button>
                   </div>
                   <Input
@@ -473,14 +487,14 @@ export default function CreateHackathon() {
                 {/* Timezone Toggle */}
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 min-w-[200px]">
-                    <Globe className="w-4 h-4 text-purple-600" />
+                    <Globe className="w-4 h-4 text-[#8B6914]" />
                     <Label className="text-gray-700 font-medium">Timezone</Label>
                     <button
                       type="button"
                       onClick={() => toggleInfo('timezone')}
                       className="text-amber-600 hover:text-amber-700"
                     >
-                      <Info className="w-4 h-4" />
+                      <Info className="w-4 h-4 text-[#8B6914]" />
                     </button>
                   </div>
                   <div className="flex items-center gap-2">
@@ -513,14 +527,14 @@ export default function CreateHackathon() {
                 {showInfo.timezone && (
                   <p className="text-sm text-gray-600 mb-4 ml-[212px]">
                     Choose how you want to input times. Local time will be converted to UTC for storage on the blockchain.
-                    All times are ultimately stored and displayed in UTC format.
+                    All times are ultimately stoamber and displayed in UTC format.
                   </p>
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-blue-500" />
+                      <Calendar className="w-4 h-4 text-[#8B6914]" />
                       <Label className="text-gray-700 font-medium">Start Date & Time *</Label>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -528,7 +542,7 @@ export default function CreateHackathon() {
                         type="date"
                         value={formData.startDate}
                         onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
-                        className="border-blue-200 focus:border-blue-500 bg-white text-gray-900 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        className="border-amber-200 focus:border-amber-500 bg-white text-gray-900 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                         style={{
                           colorScheme: 'light'
                         }}
@@ -537,7 +551,7 @@ export default function CreateHackathon() {
                         type="time"
                         value={formData.startTime}
                         onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                        className="border-blue-200 focus:border-blue-500 bg-white text-gray-900 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        className="border-amber-200 focus:border-amber-500 bg-white text-gray-900 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                         style={{
                           colorScheme: 'light'
                         }}
@@ -547,7 +561,7 @@ export default function CreateHackathon() {
 
                   <div className="space-y-4">
                     <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 text-red-500" />
+                      <Clock className="w-4 h-4 text-[#8B6914]" />
                       <Label className="text-gray-700 font-medium">End Date & Time *</Label>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
@@ -555,7 +569,7 @@ export default function CreateHackathon() {
                         type="date"
                         value={formData.endDate}
                         onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                        className="border-red-200 focus:border-red-500 bg-white text-gray-900 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        className="border-amber-200 focus:border-amber-500 bg-white text-gray-900 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                         style={{
                           colorScheme: 'light'
                         }}
@@ -564,7 +578,7 @@ export default function CreateHackathon() {
                         type="time"
                         value={formData.endTime}
                         onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                        className="border-red-200 focus:border-red-500 bg-white text-gray-900 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
+                        className="border-amber-200 focus:border-amber-500 bg-white text-gray-900 [&::-webkit-calendar-picker-indicator]:opacity-100 [&::-webkit-calendar-picker-indicator]:cursor-pointer"
                         style={{
                           colorScheme: 'light'
                         }}
@@ -574,19 +588,48 @@ export default function CreateHackathon() {
                 </div>
               </div>
 
+              {/* Image URL */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2 min-w-[200px]">
+                    <Globe className="w-4 h-4 text-[#8B6914]" />
+                    <Label htmlFor="imageURL" className="text-gray-700 font-medium">Image URL (Optional)</Label>
+                    <button
+                      type="button"
+                      onClick={() => toggleInfo('imageURL')}
+                      className="text-amber-600 hover:text-amber-700"
+                    >
+                      <Info className="w-4 h-4 text-[#8B6914]" />
+                    </button>
+                  </div>
+                  <Input
+                    id="imageURL"
+                    value={formData.imageURL}
+                    onChange={(e) => setFormData({ ...formData, imageURL: e.target.value })}
+                    placeholder="https://example.com/image.png"
+                    className="border-amber-200 focus:border-amber-500 bg-white text-gray-900 placeholder:text-gray-500 flex-1"
+                  />
+                </div>
+                {showInfo.imageURL && (
+                  <p className="text-sm text-gray-600 ml-[212px]">
+                    Optional URL for hackathon banner image. Leave empty to use default blockchain block image.
+                  </p>
+                )}
+              </div>
+
               {/* Prize Pool */}
               <div className="space-y-4">
                 {/* Prize Pool Type Toggle */}
                 <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2 min-w-[200px]">
-                    <Trophy className="w-4 h-4 text-yellow-500" />
+                    <Trophy className="w-4 h-4 text-[#8B6914]" />
                     <Label className="text-gray-700 font-medium">Prize Pool Type</Label>
                     <button
                       type="button"
                       onClick={() => toggleInfo('prizePoolType')}
                       className="text-amber-600 hover:text-amber-700"
                     >
-                      <Info className="w-4 h-4" />
+                      <Info className="w-4 h-4 text-[#8B6914]" />
                     </button>
                   </div>
                   <div className="flex items-center gap-2">
@@ -600,7 +643,6 @@ export default function CreateHackathon() {
                         : 'bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white border-none'
                       }
                     >
-                      <Coins className="w-4 h-4 mr-1" />
                       ETH
                     </Button>
                     <Button
@@ -628,12 +670,12 @@ export default function CreateHackathon() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Token Address */}
                     <div className="space-y-2">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 min-w-[180px]">
-                          <Coins className="w-4 h-4 text-purple-500" />
-                          <Label htmlFor="tokenAddress" className="text-gray-700 font-medium">Token Contract Address *</Label>
+                                              <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2 min-w-[180px]">
+                            <Coins className="w-4 h-4 text-[#8B6914]" />
+                            <Label htmlFor="tokenAddress" className="text-gray-700 font-medium">Token Contract Address *</Label>
+                          </div>
                         </div>
-                      </div>
                       <Input
                         id="tokenAddress"
                         value={formData.tokenAddress}
@@ -645,21 +687,21 @@ export default function CreateHackathon() {
 
                     {/* Prize Pool Amount */}
                     <div className="space-y-2">
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 min-w-[180px]">
-                          <Trophy className="w-4 h-4 text-yellow-600" />
-                          <Label htmlFor="prizePool" className="text-gray-700 font-medium">
-                            Prize Pool Amount ({tokenSymbol || 'Tokens'}) *
-                          </Label>
-                          <button
-                            type="button"
-                            onClick={() => toggleInfo('prizePool')}
-                            className="text-amber-600 hover:text-amber-700"
-                          >
-                            <Info className="w-4 h-4" />
-                          </button>
+                                              <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-2 min-w-[180px]">
+                            <Trophy className="w-4 h-4 text-[#8B6914]" />
+                            <Label htmlFor="prizePool" className="text-gray-700 font-medium">
+                              Prize Pool Amount ({tokenSymbol || 'Tokens'}) *
+                            </Label>
+                            <button
+                              type="button"
+                              onClick={() => toggleInfo('prizePool')}
+                              className="text-amber-600 hover:text-amber-700"
+                            >
+                              <Info className="w-4 h-4 text-[#8B6914]" />
+                            </button>
+                          </div>
                         </div>
-                      </div>
                       <Input
                         id="prizePool"
                         type="number"
@@ -679,7 +721,7 @@ export default function CreateHackathon() {
                   <div className="space-y-2">
                     <div className="flex items-center gap-4">
                       <div className="flex items-center gap-2 min-w-[200px]">
-                        <Trophy className="w-4 h-4 text-yellow-600" />
+                        <Coins className="w-4 h-4 text-yellow-600" />
                         <Label htmlFor="prizePool" className="text-gray-700 font-medium">
                           Prize Pool Amount (ETH) *
                         </Label>
@@ -719,7 +761,7 @@ export default function CreateHackathon() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="flex items-center gap-2 text-gray-800">
-                  <Users className="w-5 h-5 text-green-600" />
+                  <Users className="w-5 h-5 text-amber-500" />
                   Judges ({judges.length})
                 </CardTitle>
                 <Button
@@ -727,7 +769,7 @@ export default function CreateHackathon() {
                   onClick={addJudge}
                   variant="outline"
                   size="sm"
-                  className="flex items-center gap-2 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none border-amber-600"
+                  className="flex items-center gap-2 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none border-amber-300"
                 >
                   <Plus className="w-4 h-4" />
                   Add Judge
@@ -741,7 +783,7 @@ export default function CreateHackathon() {
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-2">
                         <Avatar className="w-8 h-8">
-                          <AvatarFallback className="text-xs bg-green-100 text-green-700">
+                          <AvatarFallback className="text-xs bg-amber-100 text-amber-700">
                             J{index + 1}
                           </AvatarFallback>
                         </Avatar>
@@ -753,41 +795,36 @@ export default function CreateHackathon() {
                           onClick={() => removeJudge(index)}
                           variant="ghost"
                           size="sm"
-                          className="text-red-500 hover:text-red-600"
+                          className="text-amber-500 hover:text-amber-600"
                         >
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-blue-500" />
+                          <Users className="w-4 h-4 text-amber-500" />
                           <Label className="text-gray-700 font-medium">Wallet Address *</Label>
                         </div>
                         <Input
                           value={judge.address}
                           onChange={(e) => updateJudge(index, 'address', e.target.value)}
                           placeholder="0x..."
-                          className="font-mono text-sm bg-white border-gray-300 text-gray-900 placeholder:text-gray-500"
+                          className={`font-mono text-sm bg-white border-gray-300 text-gray-900 placeholder:text-gray-500 ${
+                            isDuplicateAddress(judge.address, index) ? 'border-red-500' : ''
+                          }`}
                         />
+                        {isDuplicateAddress(judge.address, index) && (
+                          <p className="text-red-500 text-xs mt-1">
+                            This address is already used by another judge
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <Users className="w-4 h-4 text-green-500" />
-                          <Label className="text-gray-700 font-medium">Judge Name *</Label>
-                        </div>
-                        <Input
-                          value={judge.name}
-                          onChange={(e) => updateJudge(index, 'name', e.target.value)}
-                          placeholder="Enter judge name"
-                          className="bg-white border-gray-300 text-gray-900 placeholder:text-gray-500"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <Coins className="w-4 h-4 text-orange-500" />
+                          <Coins className="w-4 h-4 text-yellow-500" />
                           <Label className="text-gray-700 font-medium">Voting Tokens *</Label>
                         </div>
                         <Input
@@ -811,17 +848,16 @@ export default function CreateHackathon() {
             <Card className="border-0 shadow-lg bg-white backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-gray-800">
-                  <CheckCircle className="w-5 h-5 text-blue-600" />
+                  <CheckCircle className="w-5 h-5 text-amber-600" />
                   Token Approval
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center justify-between p-4 rounded-lg border border-gray-300">
                   <div className="flex items-center gap-3">
-                    <div className={`w-3 h-3 rounded-full ${needsApproval ? 'bg-orange-500' : 'bg-green-500'}`}></div>
                     <div>
                       <p className="font-medium text-gray-800">
-                        {needsApproval ? 'Approval Required' : 'Token Approved'}
+                        {needsApproval ? 'Approval Requiamber' : 'Token Approved'}
                       </p>
                       <p className="text-sm text-gray-600">
                         {needsApproval 
@@ -834,10 +870,11 @@ export default function CreateHackathon() {
                   {needsApproval && (
                     <Button
                       type="button"
+                      variant="outline"
                       onClick={handleApproveToken}
                       disabled={isApprovingToken || isApprovalLoading}
                       size="sm"
-                      className="bg-blue-600 text-white hover:bg-blue-700"
+                      className="flex items-center gap-2 bg-white text-[#8B6914] border-amber-300 hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
                     >
                       {isApprovingToken || isApprovalLoading ? (
                         <>
@@ -854,10 +891,137 @@ export default function CreateHackathon() {
             </Card>
           )}
 
+          {/* Preview Section */}
+          {(formData.name || formData.prizePool) && (
+            <Card className="border-0 shadow-lg bg-white backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-gray-800">
+                  <Eye className="w-5 h-5 text-amber-600" />
+                  Preview
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="text-sm text-gray-600 mb-4">
+                  Here's how your hackathon will appear to users:
+                </div>
+                
+                {/* Explorer Card Preview */}
+                <div>
+                  <h4 className="text-md font-semibold text-gray-700 mb-3">Explorer Page Card</h4>
+                  <div className="bg-white border border-amber-100 rounded-lg overflow-hidden shadow-sm max-w-sm mx-auto">
+                    <div className="absolute inset-0 bg-gradient-to-b from-amber-50/60 via-orange-50/30 to-amber-50/60"></div>
+                    <div className="relative z-10 p-6 flex flex-col h-full">
+                      {/* Header with Title and Image */}
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1 pr-4">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-3 line-clamp-2">
+                            {formData.name || 'Your Hackathon Name'}
+                          </h3>
+                          
+                          {/* Status Badge */}
+                          <div className="mb-4">
+                            <Badge className="text-xs font-medium px-3 py-1 bg-amber-100 text-amber-800 border-amber-200 shadow-sm">
+                              🔥 ACCEPTING SUBMISSIONS
+                            </Badge>
+                          </div>
+                        </div>
+                        
+                        {/* Image */}
+                        <div className="flex-shrink-0">
+                          <div className="h-16 w-16 relative">
+                            <img
+                              src={formData.imageURL || getImagePath("/block.png")}
+                              alt="Preview Image"
+                              className="h-full w-full object-contain rounded-lg"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = getImagePath("/block.png");
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Dates */}
+                      <div className="flex items-center justify-center gap-2 text-gray-600 mb-3">
+                        <Calendar className="w-4 h-4" />
+                        <span className="text-xs font-medium text-center">
+                          {formData.startDate ? new Date(formData.startDate).toLocaleDateString() : 'Start Date'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-center gap-2 text-gray-600 mb-4">
+                        <span className="text-xs font-medium text-center">
+                          to {formData.endDate ? new Date(formData.endDate).toLocaleDateString() : 'End Date'}
+                        </span>
+                      </div>
+                      
+                      {/* Prize */}
+                      <div className="mt-auto">
+                        <div className="flex items-center justify-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-2 rounded-full border border-amber-200">
+                          <DollarSign className="w-4 h-4" />
+                          <span className="text-sm">
+                            {formData.prizePool ? 
+                              `${formData.prizePool} ${prizePoolType === 'eth' ? 'ETH' : (tokenSymbol || 'Tokens')}` : 
+                              'Prize Pool'
+                            }
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Hackathon Page Header Preview */}
+                <div>
+                  <h4 className="text-md font-semibold text-gray-700 mb-3">Hackathon Page Header</h4>
+                  <div className="relative overflow-hidden rounded-lg shadow-md max-w-2xl mx-auto">
+                    {/* Background Image */}
+                    <div className="absolute inset-0">
+                      <img 
+                        src={formData.imageURL || getImagePath("/block.png")}
+                        alt="Preview Background"
+                        className="w-full h-48 object-cover object-right"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement;
+                          target.src = getImagePath("/block.png");
+                        }}
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/50 to-transparent" />
+                    </div>
+                    
+                    {/* Content Overlay */}
+                    <div className="relative z-10 flex items-center h-48 p-6">
+                      <div className="flex-1 space-y-3">
+                        <Badge className="bg-amber-500 hover:bg-amber-600 text-white">
+                          Accepting Submissions
+                        </Badge>
+                        <h1 className="text-2xl font-black text-white leading-tight">
+                          {formData.name || 'Your Hackathon Name'}
+                        </h1>
+                        <div className="flex items-center space-x-4 text-white/90">
+                          <div className="flex items-center space-x-2">
+                            <Trophy className="w-4 h-4 text-yellow-400" />
+                            <span className="font-bold">
+                              {formData.prizePool ? 
+                                `${formData.prizePool} ${prizePoolType === 'eth' ? 'ETH' : (tokenSymbol || 'Tokens')}` : 
+                                'Prize Pool'
+                              }
+                            </span>
+                            <span>Prize Pool</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Validation Error */}
           {validationError && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <p className="text-red-600 text-sm">{validationError}</p>
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <p className="text-amber-600 text-sm">{validationError}</p>
             </div>
           )}
 
