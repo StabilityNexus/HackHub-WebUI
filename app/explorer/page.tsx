@@ -402,7 +402,7 @@ export default function ExplorerPage() {
                           <div className="flex justify-center mb-4">
                             <div className="h-20 w-20 relative group-hover:scale-105 transition-transform duration-300">
                               <Image
-                                src={hackathon.image}
+                                src={hackathon.image || getImagePath("/block.png")}
                                 alt="Hackathon Image"
                                 width={80}
                                 height={80}
@@ -492,7 +492,7 @@ export default function ExplorerPage() {
                           <div className="flex justify-center mb-4">
                             <div className="h-20 w-20 relative group-hover:scale-105 transition-transform duration-300">
                               <Image
-                                src={hackathon.image}
+                                src={hackathon.image || getImagePath("/block.png")}
                                 alt="Hackathon Image"
                                 width={80}
                                 height={80}
