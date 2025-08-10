@@ -402,7 +402,7 @@ export default function ManageHackathonPage() {
         <Card className="bg-white">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <Users className="w-5 h-5 text-blue-500" />
+              <Users className="w-5 h-5 text-amber-500" />
               <div>
                 <p className="text-sm text-gray-800">Projects</p>
                 <p className="font-semibold text-black">{hackathonInfo.projectCount}</p>
@@ -414,7 +414,7 @@ export default function ManageHackathonPage() {
         <Card className="bg-white">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <Coins className="w-5 h-5 text-green-600" />
+              <Coins className="w-5 h-5 text-yellow-600" />
               <div>
                 <p className="text-sm text-gray-800">Total Tokens</p>
                 <p className="font-semibold text-black">{hackathonInfo.totalTokens}</p>

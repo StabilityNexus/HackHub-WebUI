@@ -15,21 +15,12 @@ import { HACKHUB_ABI } from "@/utils/contractABI/HackHub"
 import { formatEther } from "viem"
 import { useChainId } from "wagmi"
 import {
-  Rocket,
-  Users,
   Code,
-  Search,
   Plus,
-  Target,
   Zap,
-  ArrowRight,
-  Globe,
-  Coins,
-  Calendar,
   DollarSign,
   ChevronDown
 } from "lucide-react"
-import { formatUTCTimestamp } from '@/utils/timeUtils'
 
 // Helper function to get the correct image path for GitHub Pages
 const getImagePath = (path: string) => {
@@ -41,8 +32,6 @@ export default function HomePage() {
   const [recentHackathons, setRecentHackathons] = useState<HackathonData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [currentSlide, setCurrentSlide] = useState(0)
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
   const chainId = useChainId()
 
   // Fetch recent hackathons from blockchain
@@ -167,29 +156,6 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chainId])
 
-  // Handle scroll to update current slide indicator
-  const handleScroll = () => {
-    if (scrollContainerRef.current) {
-      const container = scrollContainerRef.current
-      const cardWidth = 400 // Approximate card width including gap
-      const scrollLeft = container.scrollLeft
-      const newSlide = Math.round(scrollLeft / cardWidth)
-      setCurrentSlide(newSlide)
-    }
-  }
-
-  // Scroll to specific slide
-  const scrollToSlide = (slideIndex: number) => {
-    if (scrollContainerRef.current) {
-      const container = scrollContainerRef.current
-      const cardWidth = 400 // Approximate card width including gap
-      container.scrollTo({
-        left: slideIndex * cardWidth,
-        behavior: 'smooth'
-      })
-      setCurrentSlide(slideIndex)
-    }
-  }
 
 
   // Get status badge color and style
@@ -220,7 +186,7 @@ export default function HomePage() {
             <div className="space-y-6">
               <div className="relative">            
                 {/* Main heading with enhanced styling */}
-                <div className="relative z-10">
+                <div className="relative z-10 -mt-24 pb-8">
                   <h1 className="text-6xl lg:text-7xl font-black leading-tight">
                     <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 drop-shadow-sm">
                     Welcome to the Hub for
@@ -244,7 +210,7 @@ export default function HomePage() {
             
             {/* Right side - HackHub image */}
             <div className="flex justify-center lg:justify-end pt-0">
-              <div className="relative -mt-8">
+              <div className="relative -mt-8 pb-8">
                 <img 
                   src={getImagePath("/handRevolution.png")} 
                   alt="HackHub - Think, Build, Innovate" 

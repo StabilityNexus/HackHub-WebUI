@@ -17,7 +17,7 @@ import { getFactoryAddress } from "@/utils/contractAddress"
 import { HACKHUB_FACTORY_ABI } from "@/utils/contractABI/HackHubFactory"
 import { HACKHUB_ABI } from "@/utils/contractABI/HackHub"
 import { formatEther } from "viem"
-import { Search, Filter, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff, Calendar, DollarSign } from "lucide-react"
+import { Search, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff, Calendar, DollarSign } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useChainId, useAccount } from "wagmi"
 import { Badge } from "@/components/ui/badge"
@@ -38,7 +38,6 @@ const ERC20_ABI = [
 
 export default function ExplorerPage() {
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedCategory, setSelectedCategory] = useState("All Categories")
   const [statusFilter, setStatusFilter] = useState("All Status")
   
   const [hackathons, setHackathons] = useState<HackathonData[]>([])
@@ -567,7 +566,6 @@ export default function ExplorerPage() {
           <Button 
             onClick={() => {
               setSearchTerm("")
-              setSelectedCategory("All Categories")
               setStatusFilter("All Status")
             }}
             className="bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white"

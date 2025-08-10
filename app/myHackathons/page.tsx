@@ -16,7 +16,6 @@ import { formatEther } from "viem"
 import { Trophy, Target, Calendar, Users, Vote, Gavel, Code, Coins, CheckCircle, XCircle, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff } from "lucide-react"
 import { useChainId, useAccount, useWriteContract } from "wagmi"
 import Link from "next/link"
-import { formatUTCTimestamp } from '@/utils/timeUtils'
 import { toast } from "sonner"
 
 // ERC20 ABI for token symbol
