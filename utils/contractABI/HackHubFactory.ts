@@ -1,16 +1,6 @@
 export const HACKHUB_FACTORY_ABI = [
   {
     "inputs": [],
-    "name": "OnlyOngoingHackathons",
-    "type": "error"
-  },
-  {
-    "inputs": [],
-    "name": "OnlyHackathonContract",
-    "type": "error"
-  },
-  {
-    "inputs": [],
     "name": "TokenTransferFailed",
     "type": "error"
   },
@@ -31,57 +21,6 @@ export const HACKHUB_FACTORY_ABI = [
       }
     ],
     "name": "HackathonCreated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "hackathon",
-        "type": "address"
-      }
-    ],
-    "name": "HackathonConcluded",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "hackathon",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "participant",
-        "type": "address"
-      }
-    ],
-    "name": "ParticipantRegistered",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "hackathon",
-        "type": "address"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "judge",
-        "type": "address"
-      }
-    ],
-    "name": "JudgeRegistered",
     "type": "event"
   },
   {
@@ -179,11 +118,6 @@ export const HACKHUB_FACTORY_ABI = [
         "type": "uint256[]"
       },
       {
-        "internalType": "string[]",
-        "name": "judgeNames",
-        "type": "string[]"
-      },
-      {
         "internalType": "address",
         "name": "prizeToken",
         "type": "address"
@@ -192,6 +126,11 @@ export const HACKHUB_FACTORY_ABI = [
         "internalType": "uint256",
         "name": "prizeAmount",
         "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "imageURL",
+        "type": "string"
       }
     ],
     "name": "createHackathon",
@@ -208,6 +147,19 @@ export const HACKHUB_FACTORY_ABI = [
       }
     ],
     "name": "registerParticipant",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "judge",
+        "type": "address"
+      }
+    ],
+    "name": "registerJudge",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

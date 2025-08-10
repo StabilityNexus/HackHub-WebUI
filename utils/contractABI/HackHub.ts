@@ -37,11 +37,6 @@ export const HACKHUB_ABI = [
         "type": "uint256[]"
       },
       {
-        "internalType": "string[]",
-        "name": "_judgeNames",
-        "type": "string[]"
-      },
-      {
         "internalType": "address",
         "name": "_prizeToken",
         "type": "address"
@@ -50,6 +45,11 @@ export const HACKHUB_ABI = [
         "internalType": "uint256",
         "name": "_prizeAmount",
         "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "_imageURL",
+        "type": "string"
       }
     ],
     "stateMutability": "payable",
@@ -366,34 +366,19 @@ export const HACKHUB_ABI = [
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "name": "judges",
+    "inputs": [],
+    "name": "imageURL",
     "outputs": [
       {
-        "internalType": "address",
-        "name": "addr",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "tokens",
-        "type": "uint256"
-      },
-      {
         "internalType": "string",
-        "name": "name",
+        "name": "",
         "type": "string"
       }
     ],
     "stateMutability": "view",
     "type": "function"
   },
+
   {
     "inputs": [
       {
@@ -413,6 +398,11 @@ export const HACKHUB_ABI = [
         "internalType": "address",
         "name": "recipient",
         "type": "address"
+      },
+      {
+        "internalType": "string",
+        "name": "name",
+        "type": "string"
       },
       {
         "internalType": "string",
@@ -608,6 +598,11 @@ export const HACKHUB_ABI = [
     "inputs": [
       {
         "internalType": "string",
+        "name": "_name",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
         "name": "_sourceCode",
         "type": "string"
       },
@@ -779,29 +774,19 @@ export const HACKHUB_ABI = [
     "type": "function"
   },
   {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "start",
-        "type": "uint256"
-      },
-      {
-        "internalType": "uint256",
-        "name": "end",
-        "type": "uint256"
-      }
-    ],
-    "name": "getJudgeNames",
+    "inputs": [],
+    "name": "getAllJudges",
     "outputs": [
       {
-        "internalType": "string[]",
+        "internalType": "address[]",
         "name": "",
-        "type": "string[]"
+        "type": "address[]"
       }
     ],
     "stateMutability": "view",
     "type": "function"
   },
+
   {
     "inputs": [],
     "name": "getParticipants",

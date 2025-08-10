@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { HackathonData, getHackathonStatus, getDaysRemaining, Judge, Project } from "@/hooks/useHackathons"
 import { getPublicClient } from "@wagmi/core"
 import { config } from "@/utils/config"
@@ -42,9 +43,7 @@ import {
   Minus,
   Eye,
   History,
-  ArrowLeft,
-  ChevronDown,
-  ChevronUp
+  ArrowLeft
 } from "lucide-react"
 import { useChainId, useAccount, useWriteContract } from "wagmi"
 import { toast } from "sonner"
@@ -66,9 +65,11 @@ export default function JudgeVotingClient() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [voting, setVoting] = useState(false)
-  const [expandedProject, setExpandedProject] = useState<number | null>(null)
+
   const [isERC20Prize, setIsERC20Prize] = useState(false)
   const [prizeTokenSymbol, setPrizeTokenSymbol] = useState<string>("")
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalLink, setModalLink] = useState({ url: '', type: '' })
   
   // Form state
   const [voteAmounts, setVoteAmounts] = useState<{[key: number]: number}>({})
@@ -188,20 +189,12 @@ export default function JudgeVotingClient() {
       const judges: Judge[] = []
       if (Number(judgeCount) > 0) {
         try {
-          const [judgeAddresses, judgeNames] = await Promise.all([
-            publicClient.readContract({ 
-              address: contractAddress, 
-              abi: HACKHUB_ABI, 
-              functionName: 'getJudges',
-              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
-            }) as Promise<string[]>,
-            publicClient.readContract({ 
-              address: contractAddress, 
-              abi: HACKHUB_ABI, 
-              functionName: 'getJudgeNames',
-              args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
-            }) as Promise<string[]>
-          ])
+          const judgeAddresses = await publicClient.readContract({ 
+            address: contractAddress, 
+            abi: HACKHUB_ABI, 
+            functionName: 'getJudges',
+            args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+          }) as string[]
 
           for (let i = 0; i < judgeAddresses.length; i++) {
             try {
@@ -223,7 +216,7 @@ export default function JudgeVotingClient() {
 
               judges.push({
                 address: judgeAddresses[i],
-                name: judgeNames[i],
+                name: `Judge ${i + 1}`, // Use generic name since names are no longer stored
                 tokensAllocated: Number(judgeTokens),
                 tokensRemaining: Number(remainingTokens)
               })
@@ -247,7 +240,7 @@ export default function JudgeVotingClient() {
                 abi: HACKHUB_ABI,
                 functionName: 'projects',
                 args: [BigInt(i)]
-              }) as Promise<[string, string, string, string]>, // [submitter, recipient, sourceCode, docs]
+              }) as Promise<[string, string, string, string, string]>, // [submitter, recipient, sourceCode, docs]
               publicClient.readContract({
                 address: contractAddress,
                 abi: HACKHUB_ABI,
@@ -272,9 +265,10 @@ export default function JudgeVotingClient() {
             projects.push({
               id: i,
               submitter: projectInfo[0],
-              prizeRecipient: projectInfo[1],
-              sourceCode: projectInfo[2],
-              documentation: projectInfo[3],
+              recipient: projectInfo[1],
+              name: projectInfo[2],
+              sourceCode: projectInfo[3],
+              docs: projectInfo[4],
               tokensReceived: Number(projectTokens),
               estimatedPrize: prizeAmount,
               formattedPrize: isERC20 && tokenSymbol ? `${prizeAmount.toFixed(4)} ${tokenSymbol}` : `${prizeAmount.toFixed(4)} ETH`,
@@ -438,6 +432,11 @@ export default function JudgeVotingClient() {
     setVoteAmounts({})
   }
 
+  const handleOpenLink = (url: string, type: string) => {
+    setModalLink({ url, type })
+    setModalOpen(true)
+  }
+
   // Load data on mount
   useEffect(() => {
     if (contractAddress) {
@@ -553,7 +552,7 @@ export default function JudgeVotingClient() {
         </div>
         
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-[#8B6914]">{hackathonData.hackathonName}</h1>
+          <h1 className="text-3xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">{hackathonData.hackathonName} Hackathon's Judging Dashboard</h1>
         </div>
       </div>
 
@@ -646,17 +645,21 @@ export default function JudgeVotingClient() {
                   <div className="space-y-4">
                     {/* Project Header */}
                     <div className="flex items-start justify-between">
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-3">
-                          <h3 className="text-xl font-semibold text-gray-800">Project #{project.id + 1}</h3>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-8">
+                          <div>
+                            <h3 className="text-xl font-semibold text-gray-800">{project.name || `Project #${project.id + 1}`}</h3>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-700">
+                              <span className="font-medium text-gray-800">Submitted by:</span> {project.submitter.slice(0, 6)}...{project.submitter.slice(-4)}
+                            </p>
+                          </div>
                         </div>
                         <div className="space-y-1">
-                          <p className="text-sm text-gray-700">
-                            <span className="font-medium text-gray-800">Submitted by:</span> {project.submitter.slice(0, 6)}...{project.submitter.slice(-4)}
-                          </p>
-                          {project.prizeRecipient !== project.submitter && (
+                          {project.recipient !== project.submitter && (
                             <p className="text-sm text-gray-700">
-                              <span className="font-medium text-gray-800">Prize recipient:</span> {project.prizeRecipient.slice(0, 6)}...{project.prizeRecipient.slice(-4)}
+                              <span className="font-medium text-gray-800">Prize recipient:</span> {project.recipient.slice(0, 6)}...{project.recipient.slice(-4)}
                             </p>
                           )}
                           <p className="text-sm text-gray-700">
@@ -664,60 +667,33 @@ export default function JudgeVotingClient() {
                           </p>
                         </div>
                       </div>
-                      
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setExpandedProject(expandedProject === project.id ? null : project.id)}
-                        className="text-[#8B6914] hover:bg-[#FAE5C3] hover:text-[#8B6914]"
-                      >
-                        {expandedProject === project.id ? (
-                          <ChevronUp className="w-4 h-4" />
-                        ) : (
-                          <ChevronDown className="w-4 h-4" />
-                        )}
-                      </Button>
                     </div>
 
                     {/* Project Links */}
                     <div className="flex items-center gap-4">
-                      <a 
-                        href={project.sourceCode} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-[#8B6914] hover:text-[#A0471D] font-medium"
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenLink(project.sourceCode, 'Source Code')}
+                        className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
                       >
                         <Code className="w-4 h-4" />
                         Source Code
                         <ExternalLink className="w-3 h-3" />
-                      </a>
-                      <a 
-                        href={project.documentation} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 text-sm text-[#8B6914] hover:text-[#A0471D] font-medium"
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleOpenLink(project.docs, 'Documentation')}
+                        className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
                       >
                         <FileText className="w-4 h-4" />
                         Documentation
                         <ExternalLink className="w-3 h-3" />
-                      </a>
+                      </Button>
                     </div>
 
-                    {/* Expanded Content */}
-                    {expandedProject === project.id && (
-                      <div className="pt-4 border-t space-y-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div>
-                            <Label className="text-sm font-medium text-gray-700">Source Code URL</Label>
-                            <p className="text-sm text-gray-600 mt-1 break-all">{project.sourceCode}</p>
-                          </div>
-                          <div>
-                            <Label className="text-sm font-medium text-gray-700">Documentation URL</Label>
-                            <p className="text-sm text-gray-600 mt-1 break-all">{project.documentation}</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+
 
                     {/* Voting Interface */}
                     <div className="pt-4 border-t">
@@ -762,19 +738,19 @@ export default function JudgeVotingClient() {
                           </Button>
                         </div>
 
-                        <div className="text-right space-y-2">
-                          <div>
+                        <div className="flex items-center gap-8">
+                          <div className="text-center">
                             <p className="text-sm text-muted-foreground">Your Current Vote</p>
-                            <div className="flex items-center justify-end gap-1">
+                            <div className="flex items-center justify-center gap-1">
                               <Vote className="w-4 h-4 text-blue-600" />
                               <span className="font-semibold text-blue-600">
                                 {currentVotes[project.id] || 0}
                               </span>
                             </div>
                           </div>
-                          <div>
+                          <div className="text-center">
                             <p className="text-sm text-muted-foreground">Total Project Votes</p>
-                            <div className="flex items-center justify-end gap-1">
+                            <div className="flex items-center justify-center gap-1">
                               <Vote className="w-4 h-4" style={{color: '#8B6914'}} />
                               <span className="font-semibold" style={{color: '#8B6914'}}>
                                 {project.tokensReceived}
@@ -791,6 +767,48 @@ export default function JudgeVotingClient() {
           </div>
         )}
       </div>
+
+      {/* External Link Warning Modal */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#8B6914]">
+              <AlertCircle className="w-5 h-5" />
+              External Link Warning
+            </DialogTitle>
+            <DialogDescription className="text-gray-700">
+              You are about to visit an external link. Please verify the URL before proceeding.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">{modalLink.type} URL:</Label>
+              <div className="p-3 bg-gray-50 rounded-lg border">
+                <p className="text-sm font-mono text-gray-800 break-all">{modalLink.url}</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setModalOpen(false)}
+              className="border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                window.open(modalLink.url, '_blank', 'noopener,noreferrer')
+                setModalOpen(false)
+              }}
+              className="hover:bg-[#8B6914] hover:text-white hover:border-amber-300 bg-[#FAE5C3] text-gray-800 border-none"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Open Link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 } 

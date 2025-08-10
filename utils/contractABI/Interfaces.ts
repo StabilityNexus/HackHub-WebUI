@@ -10,6 +10,7 @@ export interface IERC20Minimal {
 export interface IHackHubFactory {
   hackathonConcluded: (hackathon: string) => Promise<void>;
   registerParticipant: (participant: string) => Promise<void>;
+  registerJudge: (judge: string) => Promise<void>;
 }
 
 export interface IOwnable {
@@ -78,6 +79,15 @@ export const IHackHubFactoryABI = [
     name: "registerParticipant",
     inputs: [
       { name: "participant", type: "address", internalType: "address" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
+    type: "function",
+    name: "registerJudge",
+    inputs: [
+      { name: "judge", type: "address", internalType: "address" }
     ],
     outputs: [],
     stateMutability: "nonpayable"

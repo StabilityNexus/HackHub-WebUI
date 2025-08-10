@@ -72,17 +72,6 @@ export default function ExplorerPage() {
     return formatUTCTimestamp(timestamp)
   }
 
-  // Get status badge color
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'accepting-submissions': return 'bg-green-100 text-green-800 border-green-200'
-      case 'upcoming': return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'judging-submissions': return 'bg-orange-100 text-orange-800 border-orange-200'
-      case 'concluded': return 'bg-gray-100 text-gray-800 border-gray-200'
-      default: return 'bg-gray-100 text-gray-800 border-gray-200'
-    }
-  }
-
   // Fetch hackathons directly via wagmi
   const loadHackathons = async () => {
     try {
@@ -184,6 +173,18 @@ export default function ExplorerPage() {
             }
           }
 
+          // Get image URL
+          let imageURL = ""
+          try {
+            imageURL = await publicClient.readContract({
+              address: addr,
+              abi: HACKHUB_ABI,
+              functionName: 'imageURL',
+            }) as string
+          } catch (err) {
+            console.error('Error fetching image URL:', err)
+          }
+
           const hackathon: HackathonData = {
             id: index,
             contractAddress: addr,
@@ -201,7 +202,7 @@ export default function ExplorerPage() {
             projectCount: Number(projectCount),
             judges: [],
             projects: [],
-            image: "/placeholder.svg?height=200&width=400",
+            image: imageURL || getImagePath("/block.png"),
             isERC20Prize,
             prizeTokenSymbol: tokenSymbol,
           }
@@ -290,7 +291,7 @@ export default function ExplorerPage() {
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             {isConnected ? (
               <>
-                <Wifi className="w-4 h-4 text-green-500" />
+                <Wifi className="w-4 h-4 text-amber-500" />
                 <span>Connected to {getNetworkName(chainId)}</span>
                 <Badge variant="outline" className="ml-2">Chain ID: {chainId}</Badge>
               </>
@@ -356,8 +357,8 @@ export default function ExplorerPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="All Status">All Status</SelectItem>
-              <SelectItem value="accepting-submissions">Accepting Submissions</SelectItem>
               <SelectItem value="upcoming">Upcoming</SelectItem>
+              <SelectItem value="accepting-submissions">Accepting Submissions</SelectItem>
               <SelectItem value="judging-submissions">Judging Submissions</SelectItem>
               <SelectItem value="concluded">Concluded</SelectItem>
             </SelectContent>
@@ -401,12 +402,17 @@ export default function ExplorerPage() {
                           <div className="flex justify-center mb-4">
                             <div className="h-20 w-20 relative group-hover:scale-105 transition-transform duration-300">
                               <Image
-                                src={getImagePath("/block.png")}
-                                alt="Blockchain Block"
+                                src={hackathon.image}
+                                alt="Hackathon Image"
                                 width={80}
                                 height={80}
-                                className="h-full w-full object-contain"
+                                className="h-full w-full object-contain rounded-lg"
                                 priority
+                                onError={(e) => {
+                                  // Fallback to block.png if custom image fails to load
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = getImagePath("/block.png");
+                                }}
                               />
                             </div>
                           </div>
@@ -418,7 +424,7 @@ export default function ExplorerPage() {
 
                           {/* Status Badge */}
                           <div className="flex justify-center mb-4">
-                            <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
+                            <Badge className={`text-xs font-medium px-3 py-1 bg-orange-100 text-orange-800 border-orange-200 shadow-sm`}>
                               🔥 {status === 'accepting-submissions' ? 'ACCEPTING SUBMISSIONS' : 
                                    status === 'judging-submissions' ? 'JUDGING SUBMISSIONS' :
                                    status === 'upcoming' ? 'UPCOMING' : 'CONCLUDED'}
@@ -486,12 +492,17 @@ export default function ExplorerPage() {
                           <div className="flex justify-center mb-4">
                             <div className="h-20 w-20 relative group-hover:scale-105 transition-transform duration-300">
                               <Image
-                                src={getImagePath("/block.png")}
-                                alt="Blockchain Block"
+                                src={hackathon.image}
+                                alt="Hackathon Image"
                                 width={80}
                                 height={80}
-                                className="h-full w-full object-contain"
+                                className="h-full w-full object-contain rounded-lg"
                                 priority
+                                onError={(e) => {
+                                  // Fallback to block.png if custom image fails to load
+                                  const target = e.target as HTMLImageElement;
+                                  target.src = getImagePath("/block.png");
+                                }}
                               />
                             </div>
                           </div>
@@ -503,7 +514,7 @@ export default function ExplorerPage() {
 
                           {/* Status Badge */}
                           <div className="flex justify-center mb-4">
-                            <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
+                            <Badge className={`text-xs font-medium px-3 py-1 bg-orange-100 text-orange-800 border-orange-200 shadow-sm`}>
                               {status === 'upcoming' && '⏰'} 
                               {status === 'judging-submissions' && '⚖️'} 
                               {status === 'concluded' && '✅'} 
@@ -594,7 +605,7 @@ export default function ExplorerPage() {
               <div className="text-sm text-muted-foreground">Total Hackathons</div>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
+              <div className="text-2xl font-bold text-amber-600">
                 {hackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'accepting-submissions').length}
               </div>
               <div className="text-sm text-muted-foreground">Active Now</div>
