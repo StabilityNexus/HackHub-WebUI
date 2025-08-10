@@ -12,9 +12,10 @@ export interface Judge {
 export interface Project {
   id: number
   submitter: string
-  prizeRecipient: string // New field for prize recipient address
+  recipient: string // Prize recipient address
+  name: string // Project name
   sourceCode: string
-  documentation: string
+  docs: string // Documentation link
   tokensReceived: number
   estimatedPrize: number
   formattedPrize?: string // Formatted prize with currency symbol
