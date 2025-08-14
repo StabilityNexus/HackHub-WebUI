@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
-import OrganizerClient from './[address]/OrganizerClient'
+import OrganizerClient from './OrganizerClient'
 
 function OrganizerPageContent() {
   const searchParams = useSearchParams()

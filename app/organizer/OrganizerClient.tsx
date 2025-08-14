@@ -95,7 +95,8 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
   useEffect(() => {
     const params = new URLSearchParams(searchParams?.toString())
     params.set('page', String(currentPage))
-    router.replace(`/organizer/${organizerAddress}?${params.toString()}`)
+    params.set('address', organizerAddress)
+    router.replace(`/organizer?${params.toString()}`)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage])
 
