@@ -41,6 +41,7 @@ import { useChainId, useAccount, useWriteContract, useWaitForTransactionReceipt,
 import { toast } from "sonner"
 import Link from "next/link"
 import { formatUTCTimestamp } from '@/utils/timeUtils'
+import { hackathonDB } from '@/lib/indexedDB'
 import { IERC20MinimalABI } from '@/utils/contractABI/Interfaces'
 
 // ERC20 ABI for token symbol/decimals
@@ -473,6 +474,9 @@ export default function InteractionClient() {
       }
 
       setHackathonData(hackathon)
+      try {
+        await hackathonDB.setHackathonDetails(contractAddress, chainId, hackathon)
+      } catch {}
     } catch (err) {
       console.error('Error fetching hackathon data:', err)
       setError('Failed to load hackathon data from blockchain')
@@ -560,11 +564,20 @@ export default function InteractionClient() {
 
 
 
-  // Load data on mount
+  // Load data on mount: cache-first then refresh
   useEffect(() => {
-    if (contractAddress) {
+    const load = async () => {
+      if (!contractAddress) return
+      try {
+        const cached = await hackathonDB.getHackathonDetails(contractAddress, chainId)
+        if (cached) {
+          setHackathonData(cached)
+          setLoading(false)
+        }
+      } catch {}
       fetchHackathonData()
     }
+    load()
   }, [contractAddress, chainId])
 
   // ERC20 allowance for sponsor deposit
