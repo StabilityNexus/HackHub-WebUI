@@ -25,7 +25,7 @@ import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { formatUTCTimestamp } from '@/utils/timeUtils'
 import Image from "next/image"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { hackathonDB } from "@/lib/indexedDB"
 
 interface OrganizerClientProps {
@@ -46,6 +46,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
   const chainId = useChainId()
   const { isConnected } = useAccount()
   const router = useRouter()
+  const searchParams = useSearchParams()
   
   const organizerAddress = address
   const ITEMS_PER_PAGE = 6
@@ -81,6 +82,23 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
   // Validate organizer address format
   const isValidAddress = organizerAddress && organizerAddress.match(/^0x[a-fA-F0-9]{40}$/)
 
+  // Initialize page from URL on mount
+  useEffect(() => {
+    const pageParam = Number(searchParams?.get('page') || '1')
+    if (!Number.isNaN(pageParam) && pageParam > 0) {
+      setCurrentPage(pageParam)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Reflect page to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams?.toString())
+    params.set('page', String(currentPage))
+    router.replace(`/organizer/${organizerAddress}?${params.toString()}`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage])
+
   // Load organizer's hackathons with cache-first approach
   const loadOrganizerHackathons = async (forceSync = false) => {
     if (!isValidAddress) {
@@ -104,7 +122,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
           setTotalHackathons(cachedData.totalHackathons)
           setLoading(false)
           setLastSyncTime(new Date())
-          return
+          // Do not return; still refresh from chain to ensure up-to-date data
         }
       }
 
@@ -191,19 +209,8 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
         return
       }
 
-      // Check if we need to fetch all data (for client-side filtering) or paginated data
-      const needsAllData = searchTerm.trim() !== "" || statusFilter !== "All Status"
-      
-      let startIndex = 0
-      let endIndex = organizerAddresses.length
-      
-      if (!needsAllData) {
-        // Only paginate at blockchain level if no filters are active
-        startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-        endIndex = Math.min(startIndex + ITEMS_PER_PAGE, organizerAddresses.length)
-      }
-      
-      const paginatedAddresses = organizerAddresses.slice(startIndex, endIndex)
+      // Always fetch full details for organizer to enable consistent client-side filtering and pagination
+      const paginatedAddresses = organizerAddresses
 
       // Fetch detailed data for paginated hackathons
       const organizerHackathons: HackathonData[] = []
@@ -330,10 +337,8 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
   const effectiveTotal = hasActiveFilters ? filteredHackathons.length : totalHackathons
   const totalPages = Math.ceil(effectiveTotal / ITEMS_PER_PAGE)
   
-  // For display: if filters are active, paginate the filtered results client-side
-  const displayHackathons = hasActiveFilters 
-    ? sortedHackathons.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
-    : sortedHackathons // Already paginated at blockchain level
+  // For display: always paginate client-side (cache stores full list)
+  const displayHackathons = sortedHackathons.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
 
   const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1
   const endItem = Math.min(currentPage * ITEMS_PER_PAGE, effectiveTotal)
