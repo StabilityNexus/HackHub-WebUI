@@ -53,7 +53,7 @@ function ExplorerPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
 
-  const ITEMS_PER_PAGE = 6;
+  const ITEMS_PER_PAGE = 8;
 
   // Helper function to format prize amounts
   const formatPrizeAmount = (_hackathon: HackathonData) => {
