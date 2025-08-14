@@ -118,16 +118,6 @@ export const HACKHUB_FACTORY_ABI = [
         "type": "uint256[]"
       },
       {
-        "internalType": "address",
-        "name": "prizeToken",
-        "type": "address"
-      },
-      {
-        "internalType": "uint256",
-        "name": "prizeAmount",
-        "type": "uint256"
-      },
-      {
         "internalType": "string",
         "name": "imageURL",
         "type": "string"

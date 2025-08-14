@@ -13,7 +13,7 @@ import { config } from "@/utils/config"
 import { HACKHUB_ABI } from "@/utils/contractABI/HackHub"
 import { formatEther } from "viem"
 
-// ERC20 ABI for token symbol
+// ERC20 ABI for token symbol and decimals
 const ERC20_ABI = [
   {
     "inputs": [],
@@ -21,17 +21,22 @@ const ERC20_ABI = [
     "outputs": [{"internalType": "string", "name": "", "type": "string"}],
     "stateMutability": "view",
     "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "decimals",
+    "outputs": [{"internalType": "uint8", "name": "", "type": "uint8"}],
+    "stateMutability": "view",
+    "type": "function"
   }
 ] as const
 import { 
-  Trophy, 
   Users, 
   Gavel, 
   Settings, 
   Loader2, 
   AlertCircle,
   ArrowLeft,
-  Coins,
   CheckCircle
 } from "lucide-react"
 import { useChainId, useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi"
@@ -46,7 +51,6 @@ interface JudgeInfo {
 
 interface HackathonInfo {
   name: string
-  prizePool: string
   totalTokens: number
   judgeCount: number
   projectCount: number
@@ -54,8 +58,20 @@ interface HackathonInfo {
   organizer: string
   startTime: number
   endTime: number
-  isERC20Prize?: boolean
-  prizeTokenSymbol?: string
+}
+
+interface SubmittedTokenInfo {
+  token: string
+  name: string
+  submitter: string
+}
+
+interface ApprovedTokenInfo {
+  token: string
+  minAmount: string
+  totalAmount: string
+  symbol?: string
+  decimals?: number
 }
 
 export default function ManageHackathonPage() {
@@ -67,93 +83,76 @@ export default function ManageHackathonPage() {
   // Contract interaction
   const { writeContract, data: hash, isPending } = useWriteContract()
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({ hash })
+  // Supports adjusting judge tokens via contract function
 
   // State
   const [hackathonInfo, setHackathonInfo] = useState<HackathonInfo | null>(null)
   const [judges, setJudges] = useState<JudgeInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [needsWallet, setNeedsWallet] = useState(false)
   const [adjustingTokens, setAdjustingTokens] = useState<{[key: string]: boolean}>({})
   const [tokenAdjustments, setTokenAdjustments] = useState<{[key: string]: string}>({})
-  const [adjustingPrizePool, setAdjustingPrizePool] = useState(false)
-  const [newPrizeAmount, setNewPrizeAmount] = useState("")
+  const [submittedTokens, setSubmittedTokens] = useState<SubmittedTokenInfo[]>([])
+  const [approvedTokens, setApprovedTokens] = useState<ApprovedTokenInfo[]>([])
+  const [minAmounts, setMinAmounts] = useState<{[token: string]: string}>({})
+  const [approvingToken, setApprovingToken] = useState<{[token: string]: boolean}>({})
 
   // Handle judge token adjustment
   const handleAdjustJudgeTokens = async (judgeAddress: string, newAmount: number) => {
     if (!hackAddr || !userAddress) return
-
+    if (newAmount < 0) {
+      toast.error('Amount must be non-negative')
+      return
+    }
     try {
       setAdjustingTokens(prev => ({ ...prev, [judgeAddress]: true }))
-      
       await writeContract({
         address: hackAddr,
         abi: HACKHUB_ABI,
         functionName: 'adjustJudgeTokens',
-        args: [judgeAddress as `0x${string}`, BigInt(newAmount)],
+        args: [judgeAddress as `0x${string}`, BigInt(newAmount)]
       })
-
-      // Clear the adjustment input
-      setTokenAdjustments(prev => ({ ...prev, [judgeAddress]: "" }))
-      
+      toast.success('Judge tokens update submitted')
+      // Clear input for this judge
+      setTokenAdjustments(prev => ({ ...prev, [judgeAddress]: '' }))
+      // Data will refresh on tx confirmation via existing effect
     } catch (err: any) {
       console.error('Error adjusting judge tokens:', err)
-      setError('Failed to adjust judge tokens: ' + (err?.message || 'Unknown error'))
+      toast.error(err?.message || 'Failed to adjust judge tokens')
     } finally {
       setAdjustingTokens(prev => ({ ...prev, [judgeAddress]: false }))
     }
   }
 
-  // Handle prize pool adjustment
-  const handleAdjustPrizePool = async () => {
-    if (!hackAddr || !userAddress || !newPrizeAmount) return
-
-    const newAmountFloat = parseFloat(newPrizeAmount)
-    const currentAmountFloat = parseFloat(hackathonInfo?.prizePool || "0")
-
-    if (newAmountFloat <= currentAmountFloat) {
-      setError('New prize amount must be greater than current prize pool')
+  const handleApproveSubmittedToken = async (token: string) => {
+    if (!hackAddr) return
+    const min = minAmounts[token]
+    if (!min || isNaN(Number(min))) {
+      setError('Please enter a valid minimum amount for this token')
       return
     }
-
     try {
-      setAdjustingPrizePool(true)
-      setError(null)
-
-      if (hackathonInfo?.isERC20Prize) {
-        // For ERC20 prizes, no ETH value needed
-        await writeContract({
-          address: hackAddr,
-          abi: HACKHUB_ABI,
-          functionName: 'adjustPrizePool',
-          args: [BigInt(Math.floor(newAmountFloat * 1e18))], // Convert to wei-like units for ERC20
-        })
-      } else {
-        // For ETH prizes, send the difference as value
-        const differenceInWei = BigInt(Math.floor((newAmountFloat - currentAmountFloat) * 1e18))
-        await writeContract({
-          address: hackAddr,
-          abi: HACKHUB_ABI,
-          functionName: 'adjustPrizePool',
-          args: [BigInt(Math.floor(newAmountFloat * 1e18))],
-          value: differenceInWei
-        })
-      }
-
-      // Clear the input
-      setNewPrizeAmount("")
-      
+      setApprovingToken(prev => ({ ...prev, [token]: true }))
+      await writeContract({
+        address: hackAddr,
+        abi: HACKHUB_ABI,
+        functionName: 'approveToken',
+        args: [token as `0x${string}`, BigInt(min)]
+      })
+      setMinAmounts(prev => ({ ...prev, [token]: '' }))
     } catch (err: any) {
-      console.error('Error adjusting prize pool:', err)
-      setError('Failed to adjust prize pool: ' + (err?.message || 'Unknown error'))
+      console.error('Error approving token:', err)
+      setError('Failed to approve token: ' + (err?.message || 'Unknown error'))
     } finally {
-      setAdjustingPrizePool(false)
+      setApprovingToken(prev => ({ ...prev, [token]: false }))
     }
   }
 
   // Load hackathon data
   const loadHackathonData = async () => {
-    if (!hackAddr || !isConnected) {
-      setError('Invalid hackathon address or wallet not connected')
+    if (!hackAddr) {
+      setError('Invalid hackathon address')
       setLoading(false)
       return
     }
@@ -167,47 +166,28 @@ export default function ManageHackathonPage() {
       // Fetch basic hackathon info
       const [
         name,
-        prizePool,
         totalTokens,
         judgeCount,
         projectCount,
         concluded,
         organizer,
         startTime,
-        endTime,
-        isERC20Prize,
-        prizeToken
+        endTime
       ] = await Promise.all([
         publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'name' }) as Promise<string>,
-        publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'prizePool' }) as Promise<bigint>,
         publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'totalTokens' }) as Promise<bigint>,
         publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'judgeCount' }) as Promise<bigint>,
         publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'projectCount' }) as Promise<bigint>,
         publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'concluded' }) as Promise<boolean>,
         publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'owner' }) as Promise<string>,
         publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'startTime' }) as Promise<bigint>,
-        publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'endTime' }) as Promise<bigint>,
-        publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'isERC20Prize' }) as Promise<boolean>,
-        publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'prizeToken' }) as Promise<string>
+        publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'endTime' }) as Promise<bigint>
       ])
 
-      // Get token symbol if it's an ERC20 prize
-      let tokenSymbol = ""
-      if (isERC20Prize && prizeToken !== "0x0000000000000000000000000000000000000000") {
-        try {
-          tokenSymbol = await publicClient.readContract({
-            address: prizeToken as `0x${string}`,
-            abi: ERC20_ABI,
-            functionName: 'symbol',
-          }) as string
-        } catch (err) {
-          console.error('Error fetching token symbol:', err)
-          tokenSymbol = "TOKEN"
-        }
-      }
-
-      // Check if user is the organizer
-      if (organizer.toLowerCase() !== userAddress?.toLowerCase()) {
+      // If no wallet connected, prompt to connect to manage actions
+      if (!userAddress) {
+        setNeedsWallet(true)
+      } else if (organizer.toLowerCase() !== userAddress?.toLowerCase()) {
         setError('You are not the organizer of this hackathon')
         setLoading(false)
         return
@@ -215,16 +195,13 @@ export default function ManageHackathonPage() {
 
       setHackathonInfo({
         name,
-        prizePool: formatEther(prizePool),
         totalTokens: Number(totalTokens),
         judgeCount: Number(judgeCount),
         projectCount: Number(projectCount),
         concluded,
         organizer,
         startTime: Number(startTime),
-        endTime: Number(endTime),
-        isERC20Prize,
-        prizeTokenSymbol: tokenSymbol
+        endTime: Number(endTime)
       })
 
       // Fetch judges
@@ -234,8 +211,7 @@ export default function ManageHackathonPage() {
           const judgeAddresses = await publicClient.readContract({ 
             address: hackAddr, 
             abi: HACKHUB_ABI, 
-            functionName: 'getJudges',
-            args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+            functionName: 'getAllJudges'
           }) as string[]
 
           for (let i = 0; i < judgeAddresses.length; i++) {
@@ -264,6 +240,74 @@ export default function ManageHackathonPage() {
 
       setJudges(judgeList)
 
+      // Load submitted tokens
+      try {
+        const submitted = await publicClient.readContract({
+          address: hackAddr,
+          abi: HACKHUB_ABI,
+          functionName: 'getSubmittedTokensList'
+        }) as string[]
+        const submittedInfos: SubmittedTokenInfo[] = []
+        for (const t of submitted) {
+          const [tokenName, submitter, exists] = await publicClient.readContract({
+            address: hackAddr,
+            abi: HACKHUB_ABI,
+            functionName: 'getTokenSubmission',
+            args: [t as `0x${string}`]
+          }) as [string, string, boolean]
+          if (exists) submittedInfos.push({ token: t, name: tokenName, submitter })
+        }
+        setSubmittedTokens(submittedInfos)
+      } catch (e) {
+        console.error('Error loading submitted tokens', e)
+      }
+
+      // Load approved tokens
+      try {
+        const approved = await publicClient.readContract({
+          address: hackAddr,
+          abi: HACKHUB_ABI,
+          functionName: 'getApprovedTokensList'
+        }) as string[]
+        const approvedInfos: ApprovedTokenInfo[] = []
+        for (const t of approved) {
+          const [min, total] = await Promise.all([
+            publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'getTokenMinAmount', args: [t as `0x${string}`] }) as Promise<bigint>,
+            publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'getTokenTotal', args: [t as `0x${string}`] }) as Promise<bigint>,
+          ])
+          
+          // Get token symbol and decimals
+          let symbol = 'Unknown'
+          let decimals = 18
+          try {
+            if (t === '0x0000000000000000000000000000000000000000') {
+              symbol = 'ETH'
+              decimals = 18
+            } else {
+              const [sym, dec] = await Promise.all([
+                publicClient.readContract({ address: t as `0x${string}`, abi: ERC20_ABI, functionName: 'symbol' }) as Promise<string>,
+                publicClient.readContract({ address: t as `0x${string}`, abi: ERC20_ABI, functionName: 'decimals' }) as Promise<number>
+              ])
+              symbol = sym
+              decimals = dec
+            }
+          } catch {
+            symbol = short(t)
+          }
+          
+          approvedInfos.push({ 
+            token: t, 
+            minAmount: String(min), 
+            totalAmount: String(total),
+            symbol,
+            decimals
+          })
+        }
+        setApprovedTokens(approvedInfos)
+      } catch (e) {
+        console.error('Error loading approved tokens', e)
+      }
+
     } catch (err) {
       console.error('Error loading hackathon data:', err)
       setError('Failed to load hackathon data')
@@ -272,12 +316,22 @@ export default function ManageHackathonPage() {
     }
   }
 
-  // Helper function to format prize amounts
-  const formatPrizeAmount = (amount: string) => {
-    if (hackathonInfo?.isERC20Prize && hackathonInfo?.prizeTokenSymbol) {
-      return `${amount} ${hackathonInfo.prizeTokenSymbol}`
+  // Token address pretty
+  const short = (addr: string) => `${addr.slice(0,6)}...${addr.slice(-4)}`
+
+  // Format token amounts to whole numbers considering decimals
+  const formatTokenAmount = (amount: string, token: string, decimals?: number): string => {
+    const amountBigInt = BigInt(amount)
+    if (token === '0x0000000000000000000000000000000000000000') {
+      // ETH - convert from wei to ether and show as whole number
+      return Math.floor(Number(formatEther(amountBigInt))).toString()
+    } else {
+      // ERC20 - convert using token decimals
+      const tokenDecimals = decimals ?? 18
+      const divisor = BigInt(10) ** BigInt(tokenDecimals)
+      const wholeTokens = amountBigInt / divisor
+      return wholeTokens.toString()
     }
-    return `${amount} ETH`
   }
 
   // Helper function to determine if we're in judging phase
@@ -358,6 +412,14 @@ export default function ManageHackathonPage() {
 
   return (
     <div className="container mx-auto py-8 space-y-8">
+      {needsWallet && (
+        <Alert className="max-w-2xl mx-auto border-yellow-200 bg-yellow-50">
+          <AlertCircle className="h-4 w-4 text-yellow-700" />
+          <AlertDescription className="text-yellow-800">
+            Please connect your wallet to manage this hackathon. You can still view details below.
+          </AlertDescription>
+        </Alert>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -374,19 +436,7 @@ export default function ManageHackathonPage() {
       </div>
 
       {/* Status Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-white">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-yellow-600" />
-              <div>
-                <p className="text-sm text-gray-800">Prize Pool</p>
-                <p className="font-semibold text-black">{formatPrizeAmount(hackathonInfo.prizePool)}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="bg-white">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
@@ -414,7 +464,6 @@ export default function ManageHackathonPage() {
         <Card className="bg-white">
           <CardContent className="p-4">
             <div className="flex items-center gap-2">
-              <Coins className="w-5 h-5 text-yellow-600" />
               <div>
                 <p className="text-sm text-gray-800">Total Tokens</p>
                 <p className="font-semibold text-black">{hackathonInfo.totalTokens}</p>
@@ -469,7 +518,7 @@ export default function ManageHackathonPage() {
                           }))}
                           className="w-48 bg-white border-gray-300 text-black"
                         />
-                        <Button
+                         <Button
                           size="sm"
                           onClick={() => {
                             const newAmount = parseInt(tokenAdjustments[judge.address] || "0")
@@ -507,75 +556,88 @@ export default function ManageHackathonPage() {
         </CardContent>
       </Card>
 
-      {/* Adjust Prize Pool */}
+      {/* Submitted Tokens for Approval */}
       {!hackathonInfo.concluded && (
         <Card className="bg-white">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-black">
-              <Coins className="w-5 h-5" />
-              Adjust Prize Pool
-            </CardTitle>
+            <CardTitle className="text-black">Submitted Tokens</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-gray-700">Current Prize Pool:</span>
-                <span className="font-bold text-lg text-[#8B6914]">
-                  {formatPrizeAmount(hackathonInfo.prizePool)}
-                </span>
-              </div>
-              <p className="text-sm text-gray-600">
-                {hackathonInfo.isERC20Prize 
-                  ? 'ERC20 token prize pool' 
-                  : 'ETH prize pool'
-                }
-              </p>
-            </div>
-            
-            <div className="space-y-3">
-              <Label htmlFor="newPrizeAmount" className="text-sm font-medium text-gray-700">
-                New Prize Amount {hackathonInfo.isERC20Prize ? `(${hackathonInfo.prizeTokenSymbol})` : '(ETH)'}
-              </Label>
-              <div className="flex items-center gap-3">
-                <Input
-                  id="newPrizeAmount"
-                  type="number"
-                  step="0.001"
-                  min={parseFloat(hackathonInfo.prizePool) + 0.001}
-                  placeholder={`Enter amount greater than ${hackathonInfo.prizePool}`}
-                  value={newPrizeAmount}
-                  onChange={(e) => setNewPrizeAmount(e.target.value)}
-                  className="bg-white border-gray-300 text-black"
-                />
-                <Button
-                  onClick={handleAdjustPrizePool}
-                  disabled={
-                    adjustingPrizePool || 
-                    !newPrizeAmount || 
-                    parseFloat(newPrizeAmount) <= parseFloat(hackathonInfo.prizePool)
-                  }
-                  className="bg-[#8B6914] text-white hover:bg-[#A0471D]"
-                >
-                  {adjustingPrizePool ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                      Updating...
-                    </>
-                  ) : (
-                    'Update Prize Pool'
-                  )}
-                </Button>
-              </div>
-              <p className="text-xs text-gray-600">
-                {hackathonInfo.isERC20Prize 
-                  ? 'You must approve additional tokens before calling this function.'
-                  : 'Additional ETH will be sent with the transaction to increase the prize pool.'
-                }
-              </p>
-            </div>
+            {submittedTokens.length === 0 ? (
+              <p className="text-gray-800">No token submissions yet.</p>
+            ) : (
+              submittedTokens.map((t) => (
+                <div key={t.token} className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-start justify-between gap-6">
+                    {/* Left: token details */}
+                    <div>
+                      <p className="font-semibold text-black">{t.name || 'Token'}</p>
+                      <p className="text-sm text-gray-800">{short(t.token)}</p>
+                      <p className="text-xs text-gray-600">Submitted by {short(t.submitter)}</p>
+                    </div>
+
+                    {/* Right: input + approve button */}
+                    <div className="flex flex-col items-end gap-2 min-w-[280px]">
+                      <div className="flex items-center gap-3">
+                        <Input
+                          placeholder="Min amount (token units)"
+                          value={minAmounts[t.token] || ''}
+                          onChange={(e) => setMinAmounts(prev => ({ ...prev, [t.token]: e.target.value }))}
+                          className="w-60 bg-white border-gray-300 text-black"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => handleApproveSubmittedToken(t.token)}
+                          disabled={approvingToken[t.token] || !minAmounts[t.token]}
+                          className="bg-[#8B6914] text-white hover:bg-[#A0471D]"
+                        >
+                          {approvingToken[t.token] ? (
+                            <>
+                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                              Approving...
+                            </>
+                          ) : 'Approve Token'}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-gray-600">For ETH, min amount is in wei. For ERC20, use token's smallest unit.</p>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       )}
+
+      {/* Approved Tokens Overview */}
+      <Card className="bg-white">
+        <CardHeader>
+          <CardTitle className="text-black">Approved Tokens</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {approvedTokens.length === 0 ? (
+            <p className="text-gray-800">No approved tokens yet.</p>
+          ) : (
+            approvedTokens.map((t) => (
+              <div key={t.token} className="flex items-center justify-between border rounded-lg p-4 bg-gray-50">
+                <div>
+                  <p className="font-semibold text-black">{t.symbol || short(t.token)}</p>
+                  <p className="text-xs text-gray-600">
+                    Min: {
+                      BigInt(t.minAmount) > BigInt(0) 
+                        ? formatTokenAmount(t.minAmount, t.token, t.decimals)
+                        : 'No minimum'
+                    }
+                  </p>
+                </div>
+                <Badge variant="outline" className="text-black border-gray-400">
+                  Total: {formatTokenAmount(t.totalAmount, t.token, t.decimals)}
+                </Badge>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
 
       {/* Conclude Hackathon */}
       {!hackathonInfo.concluded && (

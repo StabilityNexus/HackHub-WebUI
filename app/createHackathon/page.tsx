@@ -2,18 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId, useReadContract } from 'wagmi'
+import { useAccount, useWriteContract, useWaitForTransactionReceipt, useChainId } from 'wagmi'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { ArrowLeft, Plus, Trash2, Calendar, Clock, Users, Trophy, Sparkles, Info, Globe, Coins, CheckCircle, Eye, DollarSign } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, Calendar, Clock, Users, Sparkles, Info, Globe, CheckCircle, Eye, Coins } from 'lucide-react'
 import { HACKHUB_FACTORY_ABI } from '@/utils/contractABI/HackHubFactory'
-import { IERC20MinimalABI } from '@/utils/contractABI/Interfaces'
 import { HackHubFactoryAddress } from '@/utils/contractAddress'
-import { isAddress, parseEther } from 'viem'
+import { isAddress } from 'viem'
 import { 
   convertLocalToUTC, 
   convertUTCToTimestamp, 
@@ -44,14 +43,11 @@ export default function CreateHackathon() {
     startTime: '',
     endDate: '',
     endTime: '',
-    prizePool: '',
-    tokenAddress: '',
     imageURL: ''
   })
   
   const [timezoneMode, setTimezoneMode] = useState<TimezoneMode>('local')
-  const [prizePoolType, setPrizePoolType] = useState<'eth' | 'token'>('eth')
-  const [tokenSymbol, setTokenSymbol] = useState<string>('')
+  // Prize pool is now handled post-creation via sponsorship deposits
   
   const [judges, setJudges] = useState<Judge[]>([
     { address: '', tokens: '' }
@@ -59,65 +55,18 @@ export default function CreateHackathon() {
   
   const [validationError, setValidationError] = useState<string>('')
   const [showInfo, setShowInfo] = useState<{ [key: string]: boolean }>({})
-  const [needsApproval, setNeedsApproval] = useState(false)
-  const [isApprovingToken, setIsApprovingToken] = useState(false)
+  // No token approvals needed at creation time
 
   const { writeContract, data: hash, error: writeError } = useWriteContract()
   const { isLoading, isSuccess, error: receiptError } = useWaitForTransactionReceipt({ hash })
 
-  // Token approval hooks
-  const { 
-    writeContract: writeApproval, 
-    data: approvalHash, 
-    error: approvalError 
-  } = useWriteContract()
-  
-  const { 
-    isLoading: isApprovalLoading, 
-    isSuccess: isApprovalSuccess, 
-    error: approvalReceiptError 
-  } = useWaitForTransactionReceipt({ hash: approvalHash })
+  // No token approval hooks required
 
-  // Check current token allowance
-  const { data: currentAllowance, refetch: refetchAllowance } = useReadContract({
-    address: formData.tokenAddress as `0x${string}`,
-    abi: IERC20MinimalABI,
-    functionName: 'allowance',
-    args: [address as `0x${string}`, HackHubFactoryAddress[534351] as `0x${string}`],
-    query: {
-      enabled: prizePoolType === 'token' && 
-               isAddress(formData.tokenAddress) && 
-               !!address && 
-               !!formData.prizePool
-    }
-  })
+  // No allowance checks at creation time
 
-  // Fetch token symbol
-  const { data: fetchedTokenSymbol } = useReadContract({
-    address: formData.tokenAddress as `0x${string}`,
-    abi: [
-      {
-        "inputs": [],
-        "name": "symbol",
-        "outputs": [{"internalType": "string", "name": "", "type": "string"}],
-        "stateMutability": "view",
-        "type": "function"
-      }
-    ] as const,
-    functionName: 'symbol',
-    query: {
-      enabled: prizePoolType === 'token' && isAddress(formData.tokenAddress)
-    }
-  })
+  // No token metadata needed at creation time
 
-  // Update token symbol when fetched
-  useEffect(() => {
-    if (fetchedTokenSymbol) {
-      setTokenSymbol(String(fetchedTokenSymbol))
-    } else {
-      setTokenSymbol('')
-    }
-  }, [fetchedTokenSymbol])
+  // No token symbol management
 
   // Smart contract has been fixed! 
   // Factory now transfers tokens directly from user to the created Hackathon contract
@@ -137,41 +86,11 @@ export default function CreateHackathon() {
     }
   }, [receiptError])
 
-  // Handle approval errors
-  useEffect(() => {
-    if (approvalError) {
-      console.error('Approval error:', approvalError)
-      setValidationError(`Token approval failed: ${approvalError.message}`)
-      setIsApprovingToken(false)
-    }
-  }, [approvalError])
+  // No approval flows
 
-  useEffect(() => {
-    if (approvalReceiptError) {
-      console.error('Approval receipt error:', approvalReceiptError)
-      setValidationError(`Token approval failed: ${approvalReceiptError.message}`)
-      setIsApprovingToken(false)
-    }
-  }, [approvalReceiptError])
+  // 
 
-  // Handle successful approval
-  useEffect(() => {
-    if (isApprovalSuccess) {
-      setIsApprovingToken(false)
-      setNeedsApproval(false)
-      refetchAllowance()
-    }
-  }, [isApprovalSuccess, refetchAllowance])
-
-  // Check if token approval is needed
-  useEffect(() => {
-    if (prizePoolType === 'token' && formData.prizePool && currentAllowance !== undefined) {
-      const requiamberAmount = parseEther(formData.prizePool)
-      setNeedsApproval(currentAllowance < requiamberAmount)
-    } else {
-      setNeedsApproval(false)
-    }
-  }, [prizePoolType, formData.prizePool, currentAllowance])
+  // 
 
   const addJudge = () => {
     setJudges([...judges, { address: '', tokens: '' }])
@@ -205,30 +124,7 @@ export default function CreateHackathon() {
     }))
   }
 
-  const handleApproveToken = async () => {
-    if (!formData.tokenAddress || !formData.prizePool) {
-      setValidationError('Please enter token address and prize pool amount first')
-      return
-    }
-
-    try {
-      setValidationError('')
-      setIsApprovingToken(true)
-      
-      const requiamberAmount = parseEther(formData.prizePool)
-      
-      await writeApproval({
-        address: formData.tokenAddress as `0x${string}`,
-        abi: IERC20MinimalABI,
-        functionName: 'approve',
-        args: [HackHubFactoryAddress[534351] as `0x${string}`, requiamberAmount]
-      })
-    } catch (err) {
-      console.error('Approval error:', err)
-      setValidationError(`Token approval failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
-      setIsApprovingToken(false)
-    }
-  }
+  // 
 
   const validateForm = (): boolean => {
     // Check if we're on the correct chain
@@ -246,29 +142,11 @@ export default function CreateHackathon() {
 
     // Check requiamber fields
     if (!formData.name || !formData.startDate || !formData.startTime || 
-        !formData.endDate || !formData.endTime || !formData.prizePool) {
+        !formData.endDate || !formData.endTime) {
       setValidationError('Please fill in all requiamber fields')
       return false
     }
-
-    // Check token address if prize pool type is token
-    if (prizePoolType === 'token' && (!formData.tokenAddress || !isAddress(formData.tokenAddress))) {
-      setValidationError('Please enter a valid token contract address')
-      return false
-    }
-
-    // Check if token approval is needed
-    if (prizePoolType === 'token' && needsApproval) {
-      setValidationError('Please approve the token spending first')
-      return false
-    }
-
-    // Check prize pool is valid
-    const prizeAmount = parseFloat(formData.prizePool)
-    if (isNaN(prizeAmount) || prizeAmount <= 0) {
-      setValidationError('Prize pool must be a positive number')
-      return false
-    }
+    // No prize pool checks at creation time
 
     // Check dates - use UTC validation
     if (!isInFuture(formData.startDate, formData.startTime, timezoneMode)) {
@@ -363,8 +241,6 @@ export default function CreateHackathon() {
         endDate,
         judges: judgeAddresses,
         tokenPerJudge,
-        prizeToken: prizePoolType === 'eth' ? '0x0000000000000000000000000000000000000000' : formData.tokenAddress,
-        prizeAmount: formData.prizePool + (prizePoolType === 'eth' ? ' ETH' : ' tokens'),
         imageURL: formData.imageURL,
         chainId,
         factoryAddress: HackHubFactoryAddress[chainId]
@@ -382,13 +258,8 @@ export default function CreateHackathon() {
           endDate,
           judgeAddresses,
           tokenPerJudge,
-          prizePoolType === 'eth' 
-            ? '0x0000000000000000000000000000000000000000' as `0x${string}`
-            : formData.tokenAddress as `0x${string}`,
-          parseEther(formData.prizePool),
           formData.imageURL || ''
-        ],
-        value: prizePoolType === 'eth' ? parseEther(formData.prizePool) : undefined
+        ]
       })
     } catch (err) {
       console.error('Transaction error:', err)
@@ -614,142 +485,7 @@ export default function CreateHackathon() {
                 )}
               </div>
 
-              {/* Prize Pool */}
-              <div className="space-y-4">
-                {/* Prize Pool Type Toggle */}
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 min-w-[200px]">
-                    <Trophy className="w-4 h-4 text-[#8B6914]" />
-                    <Label className="text-gray-700 font-medium">Prize Pool Type</Label>
-                    <button
-                      type="button"
-                      onClick={() => toggleInfo('prizePoolType')}
-                      className="text-amber-600 hover:text-amber-700"
-                    >
-                      <Info className="w-4 h-4 text-[#8B6914]" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant={prizePoolType === 'eth' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setPrizePoolType('eth')}
-                      className={prizePoolType === 'eth' 
-                        ? 'bg-[#8B6914] text-white hover:bg-[#8B6914] hover:bg-[#FAE5C3] hover:text-[#8B6914] border-none'
-                        : 'bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white border-none'
-                      }
-                    >
-                      ETH
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={prizePoolType === 'token' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setPrizePoolType('token')}
-                      className={prizePoolType === 'token' 
-                        ? 'bg-[#8B6914] text-white hover:bg-[#8B6914] hover:bg-[#FAE5C3] hover:text-[#8B6914] border-none'
-                        : 'bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white border-none'
-                      }
-                    >
-                      Token
-                    </Button>
-                  </div>
-                </div>
-                {showInfo.prizePoolType && (
-                  <p className="text-sm text-gray-600 mb-4 ml-[212px]">
-                    Choose whether to fund the prize pool with native ETH or with an ERC20 token.
-                  </p>
-                )}
-
-                {/* Token Fields - Parallel Layout */}
-                {prizePoolType === 'token' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Token Address */}
-                    <div className="space-y-2">
-                                              <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2 min-w-[180px]">
-                            <Coins className="w-4 h-4 text-[#8B6914]" />
-                            <Label htmlFor="tokenAddress" className="text-gray-700 font-medium">Token Contract Address *</Label>
-                          </div>
-                        </div>
-                      <Input
-                        id="tokenAddress"
-                        value={formData.tokenAddress}
-                        onChange={(e) => setFormData({ ...formData, tokenAddress: e.target.value })}
-                        placeholder="0x..."
-                        className="font-mono text-sm border-yellow-200 focus:border-yellow-500 bg-white text-gray-900 placeholder:text-gray-500"
-                      />
-                    </div>
-
-                    {/* Prize Pool Amount */}
-                    <div className="space-y-2">
-                                              <div className="flex items-center gap-4">
-                          <div className="flex items-center gap-2 min-w-[180px]">
-                            <Trophy className="w-4 h-4 text-[#8B6914]" />
-                            <Label htmlFor="prizePool" className="text-gray-700 font-medium">
-                              Prize Pool Amount ({tokenSymbol || 'Tokens'}) *
-                            </Label>
-                            <button
-                              type="button"
-                              onClick={() => toggleInfo('prizePool')}
-                              className="text-amber-600 hover:text-amber-700"
-                            >
-                              <Info className="w-4 h-4 text-[#8B6914]" />
-                            </button>
-                          </div>
-                        </div>
-                      <Input
-                        id="prizePool"
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={formData.prizePool}
-                        onChange={(e) => setFormData({ ...formData, prizePool: e.target.value })}
-                        placeholder={`Enter amount in ${tokenSymbol || 'tokens'}`}
-                        className="border-yellow-200 focus:border-yellow-500 bg-white text-gray-900 placeholder:text-gray-500"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {/* ETH Prize Pool Amount (when ETH is selected) */}
-                {prizePoolType === 'eth' && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2 min-w-[200px]">
-                        <Coins className="w-4 h-4 text-yellow-600" />
-                        <Label htmlFor="prizePool" className="text-gray-700 font-medium">
-                          Prize Pool Amount (ETH) *
-                        </Label>
-                        <button
-                          type="button"
-                          onClick={() => toggleInfo('prizePool')}
-                          className="text-amber-600 hover:text-amber-700"
-                        >
-                          <Info className="w-4 h-4" />
-                        </button>
-                      </div>
-                      <Input
-                        id="prizePool"
-                        type="number"
-                        step="any"
-                        min="0"
-                        value={formData.prizePool}
-                        onChange={(e) => setFormData({ ...formData, prizePool: e.target.value })}
-                        placeholder="Enter prize pool amount in ETH"
-                        className="border-yellow-200 focus:border-yellow-500 bg-white text-gray-900 placeholder:text-gray-500 flex-1"
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {showInfo.prizePool && (
-                  <p className="text-sm text-gray-600 ml-[212px]">
-                    The total prize pool that will be distributed to winners based on voting results
-                  </p>
-                )}
-              </div>
+              {/* Prize pool is removed at creation; funds can be deposited later by anyone */}
             </CardContent>
           </Card>
 
@@ -840,56 +576,10 @@ export default function CreateHackathon() {
             </CardContent>
           </Card>
 
-          {/* Token Approval Section */}
-          {prizePoolType === 'token' && formData.tokenAddress && formData.prizePool && (
-            <Card className="border-0 shadow-lg bg-white backdrop-blur-sm">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-gray-800">
-                  <CheckCircle className="w-5 h-5 text-amber-600" />
-                  Token Approval
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 rounded-lg border border-gray-300">
-                  <div className="flex items-center gap-3">
-                    <div>
-                      <p className="font-medium text-gray-800">
-                        {needsApproval ? 'Approval Requiamber' : 'Token Approved'}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        {needsApproval 
-                          ? `You need to approve the contract to spend ${formData.prizePool} tokens`
-                          : 'The contract is approved to spend your tokens'
-                        }
-                      </p>
-                    </div>
-                  </div>
-                  {needsApproval && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleApproveToken}
-                      disabled={isApprovingToken || isApprovalLoading}
-                      size="sm"
-                      className="flex items-center gap-2 bg-white text-[#8B6914] border-amber-300 hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
-                    >
-                      {isApprovingToken || isApprovalLoading ? (
-                        <>
-                          <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white mr-2"></div>
-                          Approving...
-                        </>
-                      ) : (
-                        'Approve Token'
-                      )}
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {/* Token approval section removed in new flow */}
 
           {/* Preview Section */}
-          {(formData.name || formData.prizePool) && (
+          {(formData.name) && (
             <Card className="border-0 shadow-lg bg-white backdrop-blur-sm">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-gray-800">
@@ -955,13 +645,7 @@ export default function CreateHackathon() {
                       {/* Prize */}
                       <div className="mt-auto">
                         <div className="flex items-center justify-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-2 rounded-full border border-amber-200">
-                          <DollarSign className="w-4 h-4" />
-                          <span className="text-sm">
-                            {formData.prizePool ? 
-                              `${formData.prizePool} ${prizePoolType === 'eth' ? 'ETH' : (tokenSymbol || 'Tokens')}` : 
-                              'Prize Pool'
-                            }
-                          </span>
+                            <span className="text-sm">Prize pool funded post-creation</span>
                         </div>
                       </div>
                     </div>
@@ -996,16 +680,7 @@ export default function CreateHackathon() {
                           {formData.name || 'Your Hackathon Name'}
                         </h1>
                         <div className="flex items-center space-x-4 text-white/90">
-                          <div className="flex items-center space-x-2">
-                            <Trophy className="w-4 h-4 text-yellow-400" />
-                            <span className="font-bold">
-                              {formData.prizePool ? 
-                                `${formData.prizePool} ${prizePoolType === 'eth' ? 'ETH' : (tokenSymbol || 'Tokens')}` : 
-                                'Prize Pool'
-                              }
-                            </span>
-                            <span>Prize Pool</span>
-                          </div>
+                          <div className="flex items-center space-x-2">Prize pool will be funded by sponsors</div>
                         </div>
                       </div>
                     </div>
@@ -1024,21 +699,16 @@ export default function CreateHackathon() {
 
           {/* Submit Button */}
           <div className="flex justify-center">
-            <Button
+              <Button
               type="submit"
               size="lg"
-              disabled={isLoading || (prizePoolType === 'token' && needsApproval)}
+                disabled={isLoading}
               className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white px-12 py-3 shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Creating Hackathon...
-                </>
-              ) : (prizePoolType === 'token' && needsApproval) ? (
-                <>
-                  <Coins className="w-5 h-5 mr-2" />
-                  Approve Token First
                 </>
               ) : (
                 <>

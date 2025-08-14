@@ -20,6 +20,13 @@ export interface Project {
   estimatedPrize: number
   formattedPrize?: string // Formatted prize with currency symbol
   prizeClaimed: boolean
+  payouts?: TokenPayout[]
+}
+
+export interface TokenPayout {
+  token: string
+  amount: string
+  symbol?: string
 }
 
 export interface HackathonData {

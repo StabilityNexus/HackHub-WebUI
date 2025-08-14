@@ -12,7 +12,7 @@ import { HackathonData, getHackathonStatus, getDaysRemaining, Judge, Project } f
 import { getPublicClient } from "@wagmi/core"
 import { config } from "@/utils/config"
 import { HACKHUB_ABI } from "@/utils/contractABI/HackHub"
-import { formatEther } from "viem"
+// import { formatEther } from "viem"
 import { 
   Target, 
   ExternalLink,
@@ -45,6 +45,10 @@ export default function JudgeVotingClient() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [voting, setVoting] = useState(false)
+
+  const [approvedTokens, setApprovedTokens] = useState<string[]>([])
+  const [tokenTotals, setTokenTotals] = useState<Record<string, bigint>>({})
+  const [tokenSymbols, setTokenSymbols] = useState<Record<string, string>>({})
 
   const [modalOpen, setModalOpen] = useState(false)
   const [modalLink, setModalLink] = useState({ url: '', type: '' })
@@ -79,6 +83,8 @@ export default function JudgeVotingClient() {
       default: return `Unknown (${chainId})`
     }
   }
+
+  const short = (addr: string) => `${addr.slice(0,6)}...${addr.slice(-4)}`
 
   // Check if user is a judge
   const isUserJudge = hackathonData?.judges.some(j => 
@@ -118,46 +124,67 @@ export default function JudgeVotingClient() {
         startTime,
         endDate,
         endTime,
-        prizePool,
         totalTokens,
         concluded,
         organizer,
         factory,
         judgeCount,
         projectCount,
-        isERC20,
-        prizeToken,
       ] = await Promise.all([
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'name' }) as Promise<string>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'startDate' }) as Promise<string>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'startTime' }) as Promise<bigint>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'endDate' }) as Promise<string>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'endTime' }) as Promise<bigint>,
-        publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'prizePool' }) as Promise<bigint>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'totalTokens' }) as Promise<bigint>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'concluded' }) as Promise<boolean>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'owner' }) as Promise<string>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'factory' }) as Promise<string>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'judgeCount' }) as Promise<bigint>,
         publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'projectCount' }) as Promise<bigint>,
-        publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'isERC20Prize' }) as Promise<boolean>,
-        publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'prizeToken' }) as Promise<string>,
       ])
 
-
-      // Get token symbol if it's an ERC20 prize
-      let tokenSymbol = ""
-      if (isERC20 && prizeToken !== "0x0000000000000000000000000000000000000000") {
-        try {
-          tokenSymbol = await publicClient.readContract({
-            address: prizeToken as `0x${string}`,
-            abi: ERC20_ABI,
-            functionName: 'symbol',
-          }) as string
-        } catch (err) {
-          console.error('Error fetching token symbol:', err)
-          tokenSymbol = "TOKEN"
+      // Load approved tokens and totals for payout breakdown
+      try {
+        const tokens = await publicClient.readContract({
+          address: contractAddress,
+          abi: HACKHUB_ABI,
+          functionName: 'getApprovedTokensList'
+        }) as string[]
+        setApprovedTokens(tokens)
+        const totals: Record<string, bigint> = {}
+        const symbols: Record<string, string> = {}
+        for (const t of tokens) {
+          try {
+            const total = await publicClient.readContract({
+              address: contractAddress,
+              abi: HACKHUB_ABI,
+              functionName: 'getTokenTotal',
+              args: [t as `0x${string}`]
+            }) as bigint
+            totals[t] = total
+          } catch {}
+          try {
+            if (t === '0x0000000000000000000000000000000000000000') {
+              symbols[t] = 'ETH'
+            } else {
+              const sym = await publicClient.readContract({
+                address: t as `0x${string}`,
+                abi: ERC20_ABI,
+                functionName: 'symbol'
+              }) as string
+              symbols[t] = sym
+            }
+          } catch {
+            symbols[t] = t === '0x0000000000000000000000000000000000000000' ? 'ETH' : short(t)
+          }
         }
+        setTokenTotals(totals)
+        setTokenSymbols(symbols)
+      } catch (e) {
+        setApprovedTokens([])
+        setTokenTotals({})
+        setTokenSymbols({})
       }
 
       // Fetch judges
@@ -167,8 +194,7 @@ export default function JudgeVotingClient() {
           const judgeAddresses = await publicClient.readContract({ 
             address: contractAddress, 
             abi: HACKHUB_ABI, 
-            functionName: 'getJudges',
-            args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+            functionName: 'getAllJudges'
           }) as string[]
 
           for (let i = 0; i < judgeAddresses.length; i++) {
@@ -209,7 +235,7 @@ export default function JudgeVotingClient() {
       if (Number(projectCount) > 0) {
         for (let i = 0; i < Number(projectCount); i++) {
           try {
-            const [projectInfo, projectTokens, projectPrize, prizeClaimed] = await Promise.all([
+            const [projectInfo, projectTokens, prizeClaimed] = await Promise.all([
               publicClient.readContract({
                 address: contractAddress,
                 abi: HACKHUB_ABI,
@@ -225,18 +251,19 @@ export default function JudgeVotingClient() {
               publicClient.readContract({
                 address: contractAddress,
                 abi: HACKHUB_ABI,
-                functionName: 'getProjectPrize',
-                args: [BigInt(i)]
-              }) as Promise<bigint>,
-              publicClient.readContract({
-                address: contractAddress,
-                abi: HACKHUB_ABI,
                 functionName: 'prizeClaimed',
                 args: [BigInt(i)]
               }) as Promise<boolean>
             ])
 
-            const prizeAmount = Number(formatEther(projectPrize))
+            const total = Number(totalTokens)
+            const sharePercent = total > 0 ? (Number(projectTokens) / total) * 100 : 0
+            const payouts = approvedTokens.map((t) => {
+              const poolTotal = tokenTotals[t] ?? BigInt(0)
+              const denom = totalTokens === BigInt(0) ? BigInt(1) : totalTokens
+              const amount = (poolTotal * (projectTokens as bigint)) / denom
+              return { token: t, amount: String(amount), symbol: tokenSymbols[t] }
+            })
             projects.push({
               id: i,
               submitter: projectInfo[0],
@@ -245,8 +272,9 @@ export default function JudgeVotingClient() {
               sourceCode: projectInfo[3],
               docs: projectInfo[4],
               tokensReceived: Number(projectTokens),
-              estimatedPrize: prizeAmount,
-              formattedPrize: isERC20 && tokenSymbol ? `${prizeAmount.toFixed(4)} ${tokenSymbol}` : `${prizeAmount.toFixed(4)} ETH`,
+              estimatedPrize: 0,
+              formattedPrize: `${sharePercent.toFixed(2)}% of each token pool`,
+              payouts,
               prizeClaimed
             })
           } catch (projectError) {
@@ -287,7 +315,7 @@ export default function JudgeVotingClient() {
         startTime: Number(startTime),
         endDate: Number(endDate),
         endTime: Number(endTime),
-        prizePool: formatEther(prizePool),
+        prizePool: '0',
         totalTokens: Number(totalTokens),
         concluded,
         organizer,
