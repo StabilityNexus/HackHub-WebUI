@@ -206,10 +206,49 @@ function MyHackathonsPageContent() {
         }
       } catch {}
 
-      // Fetch judges if user is a judge
+      // Fetch judges - prioritize current user's judge info
       const judges = []
       if (Number(judgeCount) > 0) {
         try {
+          // First, check if current user is a judge and get their info
+          if (userAddress) {
+            try {
+              const isUserJudge = await publicClient.readContract({
+                address: addr,
+                abi: HACKHUB_ABI,
+                functionName: 'isJudge',
+                args: [userAddress as `0x${string}`]
+              }) as boolean
+
+              if (isUserJudge) {
+                const [judgeTokens, remainingTokens] = await Promise.all([
+                  publicClient.readContract({
+                    address: addr,
+                    abi: HACKHUB_ABI,
+                    functionName: 'judgeTokens',
+                    args: [userAddress as `0x${string}`]
+                  }) as Promise<bigint>,
+                  publicClient.readContract({
+                    address: addr,
+                    abi: HACKHUB_ABI,
+                    functionName: 'remainingJudgeTokens',
+                    args: [userAddress as `0x${string}`]
+                  }) as Promise<bigint>
+                ])
+
+                judges.push({
+                  address: userAddress,
+                  name: 'You (Judge)',
+                  tokensAllocated: Number(judgeTokens),
+                  tokensRemaining: Number(remainingTokens)
+                })
+              }
+            } catch (userJudgeError) {
+              console.error('Error fetching current user judge info:', userJudgeError)
+            }
+          }
+
+          // Then fetch other judges if needed (for display purposes)
           const judgeAddresses = await publicClient.readContract({ 
             address: addr, 
             abi: HACKHUB_ABI, 
@@ -217,6 +256,11 @@ function MyHackathonsPageContent() {
           }) as string[]
 
           for (let i = 0; i < judgeAddresses.length; i++) {
+            // Skip if we already added this judge (current user)
+            if (userAddress && judgeAddresses[i].toLowerCase() === userAddress.toLowerCase()) {
+              continue
+            }
+
             try {
               // Get judge tokens allocated
               const judgeTokens = await publicClient.readContract({
@@ -366,6 +410,8 @@ function MyHackathonsPageContent() {
           const judgingFromCache = cachedData.judgingPages?.[judgingPage] || (cachedData.judgingPage === judgingPage ? cachedData.judging : undefined)
           const organizingFromCache = cachedData.organizingPages?.[organizingPage] || (cachedData.organizingPage === organizingPage ? cachedData.organizing : undefined)
 
+
+
           if (participatingFromCache) setParticipatingHackathons(participatingFromCache)
           if (judgingFromCache) setJudgingHackathons(judgingFromCache)
           if (organizingFromCache) setOrganizingHackathons(organizingFromCache)
@@ -404,7 +450,7 @@ function MyHackathonsPageContent() {
         return
       }
 
-      // Get user counts for pagination
+      // Get user counts for pagination (participants only trusted; judges will be recomputed for robustness)
       const [participantOngoingCount, participantPastCount, judgeOngoingCount, judgePastCount] = await publicClient.readContract({
         address: factoryAddress,
         abi: HACKHUB_FACTORY_ABI,
@@ -413,10 +459,11 @@ function MyHackathonsPageContent() {
       }) as [bigint, bigint, bigint, bigint]
 
       const participantTotal = Number(participantOngoingCount) + Number(participantPastCount)
-      const judgeTotal = Number(judgeOngoingCount) + Number(judgePastCount)
-      
+      // Do NOT trust judge counts from factory; recompute from hackathons for correctness
+      let judgeTotal = 0
+
       setParticipatingTotal(participantTotal)
-      setJudgingTotal(judgeTotal)
+      // judging total will be set after recomputation below
 
       // For organizing, we need to get all hackathons and filter by owner
       const [ongoingCount, pastCount] = await publicClient.readContract({
@@ -464,46 +511,7 @@ function MyHackathonsPageContent() {
         }
       }
 
-      // Load judging hackathons with pagination
-      let judgingAddresses: `0x${string}`[] = []
-      if (judgeTotal > 0) {
-        const startIndex = (judgingPage - 1) * ITEMS_PER_PAGE
-        const endIndex = Math.min(startIndex + ITEMS_PER_PAGE - 1, judgeTotal - 1)
-        
-        // Get judge ongoing hackathons
-        const judgeOngoing = Number(judgeOngoingCount)
-        if (judgeOngoing > 0 && startIndex < judgeOngoing) {
-          const ongoingStart = Math.max(0, startIndex)
-          const ongoingEnd = Math.min(judgeOngoing - 1, endIndex)
-          
-          const ongoingAddrs = await publicClient.readContract({
-            address: factoryAddress,
-            abi: HACKHUB_FACTORY_ABI,
-            functionName: 'getJudgeHackathons',
-            args: [userAddress, BigInt(ongoingStart), BigInt(ongoingEnd), true],
-          }) as `0x${string}`[]
-          judgingAddresses = judgingAddresses.concat(ongoingAddrs)
-        }
-
-        // Get judge past hackathons if needed
-        const judgePast = Number(judgePastCount)
-        if (judgePast > 0 && endIndex >= judgeOngoing) {
-          const pastStartIndex = Math.max(0, startIndex - judgeOngoing)
-          const pastEndIndex = Math.min(judgePast - 1, endIndex - judgeOngoing)
-          
-          if (pastStartIndex <= pastEndIndex) {
-            const pastAddrs = await publicClient.readContract({
-              address: factoryAddress,
-              abi: HACKHUB_FACTORY_ABI,
-              functionName: 'getJudgeHackathons',
-              args: [userAddress, BigInt(pastStartIndex), BigInt(pastEndIndex), false],
-            }) as `0x${string}`[]
-            judgingAddresses = judgingAddresses.concat(pastAddrs)
-          }
-        }
-      }
-
-      // Load organizing hackathons (filter all hackathons by owner)
+      // Load organizing hackathons (filter all hackathons by owner) and prepare a full list for judge recompute
       let organizingAddresses: `0x${string}`[] = []
       const organizingStartIndex = (organizingPage - 1) * ITEMS_PER_PAGE
       
@@ -529,6 +537,38 @@ function MyHackathonsPageContent() {
           args: [BigInt(0), BigInt(Number(pastCount) - 1), false],
         }) as `0x${string}`[]
         allAddresses = allAddresses.concat(pastAddrs)
+      }
+
+      // Recompute judge hackathons by checking isJudge(user) on each hackathon
+      let recomputedJudgeAddresses: `0x${string}`[] = []
+      if (allAddresses.length > 0) {
+        const judgeFlags = await Promise.all(
+          allAddresses.map(async (addr) => {
+            try {
+              const isJ = await publicClient.readContract({
+                address: addr,
+                abi: HACKHUB_ABI,
+                functionName: 'isJudge',
+                args: [userAddress as `0x${string}`]
+              }) as boolean
+              return isJ
+            } catch {
+              return false
+            }
+          })
+        )
+        recomputedJudgeAddresses = allAddresses.filter((_, i) => judgeFlags[i])
+      }
+
+      judgeTotal = recomputedJudgeAddresses.length
+      setJudgingTotal(judgeTotal)
+
+      // Apply pagination to recomputed judge hackathons
+      let judgingAddresses: `0x${string}`[] = []
+      if (judgeTotal > 0) {
+        const judgingStartIndex = (judgingPage - 1) * ITEMS_PER_PAGE
+        const judgingEndIndex = Math.min(judgingStartIndex + ITEMS_PER_PAGE, judgeTotal)
+        judgingAddresses = recomputedJudgeAddresses.slice(judgingStartIndex, judgingEndIndex)
       }
 
       // Filter by organizer and apply pagination
@@ -758,10 +798,17 @@ function MyHackathonsPageContent() {
       j.address.toLowerCase() === (userAddress || '').toLowerCase()
     )
 
-    if (!userJudge) return null
+    // Since this hackathon came from getJudgeHackathons, we know the user is a judge
+    // If userJudge is not found in the judges array, create a default entry
+    const judgeInfo = userJudge || {
+      address: userAddress || '',
+      name: 'Judge',
+      tokensAllocated: 0,
+      tokensRemaining: 0
+    }
 
-    const tokenUsagePercent = userJudge.tokensAllocated > 0 
-      ? ((userJudge.tokensAllocated - userJudge.tokensRemaining) / userJudge.tokensAllocated) * 100
+    const tokenUsagePercent = judgeInfo.tokensAllocated > 0 
+      ? ((judgeInfo.tokensAllocated - judgeInfo.tokensRemaining) / judgeInfo.tokensAllocated) * 100
       : 0
 
     return (
@@ -790,12 +837,12 @@ function MyHackathonsPageContent() {
               <div className="flex items-center gap-2">
                 <Vote className="w-4 h-4 text-[#8B6914]" />
                 <span className="text-sm text-gray-600">
-                  {userJudge.tokensRemaining} / {userJudge.tokensAllocated} tokens left
+                  {judgeInfo.tokensRemaining} / {judgeInfo.tokensAllocated} tokens left
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <Gavel className="w-4 h-4 text-[#8B6914]" />
-                <span className="text-sm text-gray-600">Judge: {userJudge.name}</span>
+                <span className="text-sm text-gray-600">Judge: {judgeInfo.name}</span>
               </div>
             </div>
 
@@ -818,7 +865,7 @@ function MyHackathonsPageContent() {
               </div>
               
               <div className="flex gap-2">
-                {status === 'judging-submissions' && userJudge.tokensRemaining > 0 && (
+                {status === 'judging-submissions' && judgeInfo.tokensRemaining > 0 && (
                   <Link href={`/h/judge?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}>
                     <Button size="sm" className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white">
                       Vote on Projects
@@ -1002,21 +1049,7 @@ function MyHackathonsPageContent() {
   const currentPageNum = getCurrentPage()
   const calculatedTotalPages = Math.ceil(currentTotal / ITEMS_PER_PAGE)
   
-  // Debug pagination
-  console.log('MyHackathons pagination debug:', {
-    activeTab,
-    participatingTotal,
-    judgingTotal,
-    organizingTotal,
-    currentTotal,
-    currentPageNum,
-    calculatedTotalPages,
-    participatingPage,
-    judgingPage,
-    organizingPage,
-    currentHackathonsLength: currentHackathons.length,
-    loading
-  })
+
 
   return (
     <div className="space-y-8">
@@ -1161,7 +1194,7 @@ function MyHackathonsPageContent() {
           <h3 className="text-lg font-semibold mb-2 text-gray-800">No hackathons found</h3>
           <p className="text-gray-600 mb-4">
             {activeTab === "participating" && "You haven't submitted to any hackathons yet. Find one to join!"}
-            {activeTab === "judging" && "You haven't been assigned as a judge yet. Stay tuned for opportunities!"}
+            {activeTab === "judging" && "You're not currently assigned as a judge on any hackathons. Organizers invite judges, so you'll appear here when selected!"}
             {activeTab === "organizing" && "You haven't organized any hackathons yet. Create your first event!"}
           </p>
           <Link href={activeTab === "participating" ? "/explorer" : 
