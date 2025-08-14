@@ -10,15 +10,22 @@ function OrganizerPageContent() {
   const [address, setAddress] = useState<string | null>(null)
 
   useEffect(() => {
-    // Get address from URL hash or search params
-    const addressFromHash = window.location.hash.replace('#', '')
-    const addressFromParams = searchParams.get('address')
-    
-    if (addressFromHash && addressFromHash.match(/^0x[a-fA-F0-9]{40}$/)) {
-      setAddress(addressFromHash)
-    } else if (addressFromParams && addressFromParams.match(/^0x[a-fA-F0-9]{40}$/)) {
-      setAddress(addressFromParams)
+    // Prefer address from query param; fallback to path segment; avoid stale hash issues
+    const addressFromParams = searchParams.get('address')?.trim() || ''
+    let next: string | null = null
+
+    if (/^0x[a-fA-F0-9]{40}$/.test(addressFromParams)) {
+      next = addressFromParams
+    } else {
+      // Try to read "/organizer/<address>" from pathname
+      const parts = window.location.pathname.split('/').filter(Boolean)
+      const idx = parts.findIndex(p => p.toLowerCase() === 'organizer')
+      if (idx >= 0 && parts[idx + 1] && /^0x[a-fA-F0-9]{40}$/.test(parts[idx + 1])) {
+        next = parts[idx + 1]
+      }
     }
+
+    setAddress(next)
   }, [searchParams])
 
   if (!address) {
