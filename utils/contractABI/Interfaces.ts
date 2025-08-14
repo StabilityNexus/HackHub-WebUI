@@ -5,6 +5,7 @@ export interface IERC20Minimal {
   transferFrom: (from: string, to: string, amount: bigint) => Promise<boolean>;
   approve: (spender: string, amount: bigint) => Promise<boolean>;
   allowance: (owner: string, spender: string) => Promise<bigint>;
+  balanceOf: (account: string) => Promise<bigint>;
 }
 
 export interface IHackHubFactory {
@@ -57,6 +58,15 @@ export const IERC20MinimalABI = [
     inputs: [
       { name: "owner", type: "address", internalType: "address" },
       { name: "spender", type: "address", internalType: "address" }
+    ],
+    outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "balanceOf",
+    inputs: [
+      { name: "account", type: "address", internalType: "address" }
     ],
     outputs: [{ name: "", type: "uint256", internalType: "uint256" }],
     stateMutability: "view"
