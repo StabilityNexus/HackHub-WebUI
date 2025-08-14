@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -12,11 +12,13 @@ import { config } from "@/utils/config"
 import { getFactoryAddress } from "@/utils/contractAddress"
 import { HACKHUB_FACTORY_ABI } from "@/utils/contractABI/HackHubFactory"
 import { HACKHUB_ABI } from "@/utils/contractABI/HackHub"
-import { formatEther } from "viem"
-import { Trophy, Target, Calendar, Users, Vote, Gavel, Code, Coins, CheckCircle, XCircle, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff } from "lucide-react"
+// import { formatEther } from "viem"
+import { Trophy, Target, Calendar, Users, Vote, Gavel, Code, Coins, CheckCircle, XCircle, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react"
 import { useChainId, useAccount, useWriteContract } from "wagmi"
 import Link from "next/link"
 import { toast } from "sonner"
+import { hackathonDB } from "@/lib/indexedDB"
+import { useRouter, useSearchParams } from "next/navigation"
 
 // ERC20 ABI for token symbol
 const ERC20_ABI = [
@@ -31,7 +33,7 @@ const ERC20_ABI = [
 
 type TabType = "participating" | "judging" | "organizing"
 
-export default function MyHackathonsPage() {
+function MyHackathonsPageContent() {
   const [activeTab, setActiveTab] = useState<TabType>("participating")
 
   
@@ -42,20 +44,53 @@ export default function MyHackathonsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   
+  // Pagination state for each tab
+  const [participatingPage, setParticipatingPage] = useState(1)
+  const [judgingPage, setJudgingPage] = useState(1)
+  const [organizingPage, setOrganizingPage] = useState(1)
+  const [participatingTotal, setParticipatingTotal] = useState(0)
+  const [judgingTotal, setJudgingTotal] = useState(0)
+  const [organizingTotal, setOrganizingTotal] = useState(0)
+  const [syncing, setSyncing] = useState(false)
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
+
+  const ITEMS_PER_PAGE = 6
+  
   const chainId = useChainId()
   const { address: userAddress, isConnected } = useAccount()
   const { writeContract } = useWriteContract()
-  
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Initialize tab and page from URL on mount
+  useEffect(() => {
+    const tabParam = (searchParams?.get('tab') as TabType) || "participating"
+    const pageParam = Number(searchParams?.get('page') || '1')
+    if (["participating","judging","organizing"].includes(tabParam)) {
+      setActiveTab(tabParam)
+    }
+    if (!Number.isNaN(pageParam) && pageParam > 0) {
+      if (tabParam === 'participating') setParticipatingPage(pageParam)
+      if (tabParam === 'judging') setJudgingPage(pageParam)
+      if (tabParam === 'organizing') setOrganizingPage(pageParam)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Reflect tab/page to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams?.toString())
+    params.set('tab', activeTab)
+    params.set('page', String(getCurrentPage()))
+    router.replace(`/myHackathons?${params.toString()}`)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, participatingPage, judgingPage, organizingPage])
+
   // Claim state
   const [claimingPrizes, setClaimingPrizes] = useState<{[key: string]: boolean}>({})
 
   // Helper function to format prize amounts
-  const formatPrizeAmount = (hackathon: HackathonData) => {
-    if (hackathon.isERC20Prize && hackathon.prizeTokenSymbol) {
-      return `${hackathon.prizePool} ${hackathon.prizeTokenSymbol}`
-    }
-    return `${hackathon.prizePool} ETH`
-  }
+  const formatPrizeAmount = (_hackathon: HackathonData) => 'Sponsored multi-token pool'
 
   // Handle claim prize
   const handleClaimPrize = async (hackathonAddress: string, projectId: number) => {
@@ -114,46 +149,62 @@ export default function MyHackathonsPage() {
         startTime,
         endDate,
         endTime,
-        prizePool,
         totalTokens,
         concluded,
         organizer,
         factory,
         judgeCount,
         projectCount,
-        isERC20Prize,
-        prizeToken,
       ] = await Promise.all([
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'name' }) as Promise<string>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startDate' }) as Promise<string>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startTime' }) as Promise<bigint>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'endDate' }) as Promise<string>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'endTime' }) as Promise<bigint>,
-        publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'prizePool' }) as Promise<bigint>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'totalTokens' }) as Promise<bigint>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'concluded' }) as Promise<boolean>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'owner' }) as Promise<string>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'factory' }) as Promise<string>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'judgeCount' }) as Promise<bigint>,
         publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'projectCount' }) as Promise<bigint>,
-        publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'isERC20Prize' }) as Promise<boolean>,
-        publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'prizeToken' }) as Promise<string>,
       ])
 
-      // Get token symbol if it's an ERC20 prize
-      let tokenSymbol = "ETH"
-      if (isERC20Prize && prizeToken !== "0x0000000000000000000000000000000000000000") {
-        try {
-          tokenSymbol = await publicClient.readContract({
-            address: prizeToken as `0x${string}`,
-            abi: ERC20_ABI,
-            functionName: 'symbol',
-          }) as string
-        } catch (err) {
-          console.error('Error fetching token symbol:', err)
-          tokenSymbol = "TOKEN"
+      // Load approved tokens and totals for payout breakdown
+      let approvedTokens: string[] = []
+      const tokenTotals: Record<string, bigint> = {}
+      const tokenSymbols: Record<string, string> = {}
+      try {
+        approvedTokens = await publicClient.readContract({
+          address: addr,
+          abi: HACKHUB_ABI,
+          functionName: 'getApprovedTokensList'
+        }) as string[]
+        for (const t of approvedTokens) {
+          try {
+            const total = await publicClient.readContract({
+              address: addr,
+              abi: HACKHUB_ABI,
+              functionName: 'getTokenTotal',
+              args: [t as `0x${string}`]
+            }) as bigint
+            tokenTotals[t] = total
+          } catch {}
+          try {
+            if (t === '0x0000000000000000000000000000000000000000') {
+              tokenSymbols[t] = 'ETH'
+            } else {
+              const sym = await publicClient.readContract({
+                address: t as `0x${string}`,
+                abi: ERC20_ABI,
+                functionName: 'symbol'
+              }) as string
+              tokenSymbols[t] = sym
+            }
+          } catch {
+            tokenSymbols[t] = t === '0x0000000000000000000000000000000000000000' ? 'ETH' : `${t.slice(0,6)}...${t.slice(-4)}`
+          }
         }
-      }
+      } catch {}
 
       // Fetch judges if user is a judge
       const judges = []
@@ -162,8 +213,7 @@ export default function MyHackathonsPage() {
           const judgeAddresses = await publicClient.readContract({ 
             address: addr, 
             abi: HACKHUB_ABI, 
-            functionName: 'getJudges',
-            args: [BigInt(0), BigInt(Number(judgeCount) - 1)]
+            functionName: 'getAllJudges'
           }) as string[]
 
           for (let i = 0; i < judgeAddresses.length; i++) {
@@ -210,7 +260,7 @@ export default function MyHackathonsPage() {
           }) as bigint
 
           if (userProjectId !== undefined) {
-            const [projectInfo, projectTokens, projectPrize, prizeClaimed] = await Promise.all([
+            const [projectInfo, projectTokens, prizeClaimed] = await Promise.all([
               publicClient.readContract({
                 address: addr,
                 abi: HACKHUB_ABI,
@@ -226,16 +276,19 @@ export default function MyHackathonsPage() {
               publicClient.readContract({
                 address: addr,
                 abi: HACKHUB_ABI,
-                functionName: 'getProjectPrize',
-                args: [userProjectId]
-              }) as Promise<bigint>,
-              publicClient.readContract({
-                address: addr,
-                abi: HACKHUB_ABI,
                 functionName: 'prizeClaimed',
                 args: [userProjectId]
               }) as Promise<boolean>
             ])
+
+            const total = Number(totalTokens)
+            const sharePercent = total > 0 ? (Number(projectTokens) / total) * 100 : 0
+            const payouts = approvedTokens.map((t) => {
+              const poolTotal = tokenTotals[t] ?? BigInt(0)
+              const denom = totalTokens === BigInt(0) ? BigInt(1) : totalTokens
+              const amount = (poolTotal * (projectTokens as bigint)) / denom
+              return { token: t, amount: String(amount), symbol: tokenSymbols[t] }
+            })
 
             projects.push({
               id: Number(userProjectId),
@@ -245,7 +298,9 @@ export default function MyHackathonsPage() {
               sourceCode: projectInfo[3],
               docs: projectInfo[4],
               tokensReceived: Number(projectTokens),
-              estimatedPrize: Number(formatEther(projectPrize)),
+              estimatedPrize: 0,
+              formattedPrize: `${sharePercent.toFixed(2)}% of each token pool`,
+              payouts,
               prizeClaimed
             })
           }
@@ -262,7 +317,7 @@ export default function MyHackathonsPage() {
         startTime: Number(startTime),
         endDate: Number(endDate),
         endTime: Number(endTime),
-        prizePool: formatEther(prizePool),
+        prizePool: '0',
         totalTokens: Number(totalTokens),
         concluded,
         organizer,
@@ -271,11 +326,9 @@ export default function MyHackathonsPage() {
         projectCount: Number(projectCount),
         judges,
         projects,
-        description: `Web3 Hackathon with ${formatEther(prizePool)} ${tokenSymbol} prize pool`,
+        description: `Web3 Hackathon with sponsored multi-token prize pool`,
         image: "/placeholder.svg?height=200&width=400",
         tags: ["Web3", "Blockchain"],
-        isERC20Prize,
-        prizeTokenSymbol: tokenSymbol,
       }
 
       return hackathon
@@ -285,8 +338,8 @@ export default function MyHackathonsPage() {
     }
   }
 
-  // Load user's hackathons
-  const loadUserHackathons = async () => {
+  // Load user's hackathons with cache-first approach
+  const loadUserHackathons = async (forceSync = false) => {
     if (!userAddress || !isConnected) {
       setError('Please connect your wallet to view your hackathons')
       setLoading(false)
@@ -294,8 +347,54 @@ export default function MyHackathonsPage() {
     }
 
     try {
-      setLoading(true)
+      setLoading(!forceSync) // Don't show loading spinner if it's a sync
+      if (forceSync) setSyncing(true)
       setError(null)
+
+      // Try to load from cache first (unless force syncing)
+      if (!forceSync) {
+        const cachedData = await hackathonDB.getUserHackathons(userAddress, chainId)
+        if (cachedData) {
+          // Always hydrate totals immediately for correct pagination numbers
+          setParticipatingTotal(cachedData.participatingTotal)
+          setJudgingTotal(cachedData.judgingTotal)
+          setOrganizingTotal(cachedData.organizingTotal)
+          setLastSyncTime(new Date())
+
+          // Prefer multi-page caches if present; fallback to legacy single-page fields
+          const participatingFromCache = cachedData.participatingPages?.[participatingPage] || (cachedData.participatingPage === participatingPage ? cachedData.participating : undefined)
+          const judgingFromCache = cachedData.judgingPages?.[judgingPage] || (cachedData.judgingPage === judgingPage ? cachedData.judging : undefined)
+          const organizingFromCache = cachedData.organizingPages?.[organizingPage] || (cachedData.organizingPage === organizingPage ? cachedData.organizing : undefined)
+
+          if (participatingFromCache) setParticipatingHackathons(participatingFromCache)
+          if (judgingFromCache) setJudgingHackathons(judgingFromCache)
+          if (organizingFromCache) setOrganizingHackathons(organizingFromCache)
+
+          const hydratedActive = (
+            (activeTab === 'participating' && !!participatingFromCache) ||
+            (activeTab === 'judging' && !!judgingFromCache) ||
+            (activeTab === 'organizing' && !!organizingFromCache)
+          )
+          if (hydratedActive) setLoading(false)
+        }
+      }
+
+      // Fetch from blockchain
+      await fetchUserDataFromBlockchain()
+    } catch (err) {
+      console.error('Error loading user hackathons:', err)
+      setError('Failed to load hackathons from blockchain')
+    } finally {
+      setLoading(false)
+      setSyncing(false)
+    }
+  }
+
+  // Fetch user's hackathons from blockchain with pagination
+  const fetchUserDataFromBlockchain = async () => {
+    if (!userAddress) return
+
+    try {
 
       const publicClient = getPublicClient(config)
       const factoryAddress = getFactoryAddress(chainId)
@@ -305,13 +404,111 @@ export default function MyHackathonsPage() {
         return
       }
 
-      // Get all hackathon addresses first
+      // Get user counts for pagination
+      const [participantOngoingCount, participantPastCount, judgeOngoingCount, judgePastCount] = await publicClient.readContract({
+        address: factoryAddress,
+        abi: HACKHUB_FACTORY_ABI,
+        functionName: 'getUserCounts',
+        args: [userAddress]
+      }) as [bigint, bigint, bigint, bigint]
+
+      const participantTotal = Number(participantOngoingCount) + Number(participantPastCount)
+      const judgeTotal = Number(judgeOngoingCount) + Number(judgePastCount)
+      
+      setParticipatingTotal(participantTotal)
+      setJudgingTotal(judgeTotal)
+
+      // For organizing, we need to get all hackathons and filter by owner
       const [ongoingCount, pastCount] = await publicClient.readContract({
         address: factoryAddress,
         abi: HACKHUB_FACTORY_ABI,
         functionName: 'getCounts',
       }) as [bigint, bigint]
 
+      // Load participating hackathons with pagination
+      let participatingAddresses: `0x${string}`[] = []
+      if (participantTotal > 0) {
+        const startIndex = (participatingPage - 1) * ITEMS_PER_PAGE
+        const endIndex = Math.min(startIndex + ITEMS_PER_PAGE - 1, participantTotal - 1)
+        
+        // Get participant ongoing hackathons
+        const participantOngoing = Number(participantOngoingCount)
+        if (participantOngoing > 0 && startIndex < participantOngoing) {
+          const ongoingStart = Math.max(0, startIndex)
+          const ongoingEnd = Math.min(participantOngoing - 1, endIndex)
+          
+          const ongoingAddrs = await publicClient.readContract({
+            address: factoryAddress,
+            abi: HACKHUB_FACTORY_ABI,
+            functionName: 'getParticipantHackathons',
+            args: [userAddress, BigInt(ongoingStart), BigInt(ongoingEnd), true],
+          }) as `0x${string}`[]
+          participatingAddresses = participatingAddresses.concat(ongoingAddrs)
+        }
+
+        // Get participant past hackathons if needed
+        const participantPast = Number(participantPastCount)
+        if (participantPast > 0 && endIndex >= participantOngoing) {
+          const pastStartIndex = Math.max(0, startIndex - participantOngoing)
+          const pastEndIndex = Math.min(participantPast - 1, endIndex - participantOngoing)
+          
+          if (pastStartIndex <= pastEndIndex) {
+            const pastAddrs = await publicClient.readContract({
+              address: factoryAddress,
+              abi: HACKHUB_FACTORY_ABI,
+              functionName: 'getParticipantHackathons',
+              args: [userAddress, BigInt(pastStartIndex), BigInt(pastEndIndex), false],
+            }) as `0x${string}`[]
+            participatingAddresses = participatingAddresses.concat(pastAddrs)
+          }
+        }
+      }
+
+      // Load judging hackathons with pagination
+      let judgingAddresses: `0x${string}`[] = []
+      if (judgeTotal > 0) {
+        const startIndex = (judgingPage - 1) * ITEMS_PER_PAGE
+        const endIndex = Math.min(startIndex + ITEMS_PER_PAGE - 1, judgeTotal - 1)
+        
+        // Get judge ongoing hackathons
+        const judgeOngoing = Number(judgeOngoingCount)
+        if (judgeOngoing > 0 && startIndex < judgeOngoing) {
+          const ongoingStart = Math.max(0, startIndex)
+          const ongoingEnd = Math.min(judgeOngoing - 1, endIndex)
+          
+          const ongoingAddrs = await publicClient.readContract({
+            address: factoryAddress,
+            abi: HACKHUB_FACTORY_ABI,
+            functionName: 'getJudgeHackathons',
+            args: [userAddress, BigInt(ongoingStart), BigInt(ongoingEnd), true],
+          }) as `0x${string}`[]
+          judgingAddresses = judgingAddresses.concat(ongoingAddrs)
+        }
+
+        // Get judge past hackathons if needed
+        const judgePast = Number(judgePastCount)
+        if (judgePast > 0 && endIndex >= judgeOngoing) {
+          const pastStartIndex = Math.max(0, startIndex - judgeOngoing)
+          const pastEndIndex = Math.min(judgePast - 1, endIndex - judgeOngoing)
+          
+          if (pastStartIndex <= pastEndIndex) {
+            const pastAddrs = await publicClient.readContract({
+              address: factoryAddress,
+              abi: HACKHUB_FACTORY_ABI,
+              functionName: 'getJudgeHackathons',
+              args: [userAddress, BigInt(pastStartIndex), BigInt(pastEndIndex), false],
+            }) as `0x${string}`[]
+            judgingAddresses = judgingAddresses.concat(pastAddrs)
+          }
+        }
+      }
+
+      // Load organizing hackathons (filter all hackathons by owner)
+      let organizingAddresses: `0x${string}`[] = []
+      const organizingStartIndex = (organizingPage - 1) * ITEMS_PER_PAGE
+      
+      // Get all hackathons and filter by owner - this is not optimal but necessary
+      // since there's no direct contract function for organizer hackathons
       let allAddresses: `0x${string}`[] = []
       
       if (Number(ongoingCount) > 0) {
@@ -334,46 +531,10 @@ export default function MyHackathonsPage() {
         allAddresses = allAddresses.concat(pastAddrs)
       }
 
-      // Filter hackathons by user's role
-      const participantAddresses: `0x${string}`[] = []
-      const judgeAddresses: `0x${string}`[] = []
-      const organizingAddresses: `0x${string}`[] = []
-
+      // Filter by organizer and apply pagination
+      const filteredOrganizerAddresses: `0x${string}`[] = []
       for (const addr of allAddresses) {
         try {
-          // Check if user is a participant
-          try {
-            const participantProjectId = await publicClient.readContract({
-              address: addr,
-              abi: HACKHUB_ABI,
-              functionName: 'participantProjectId',
-              args: [userAddress]
-            }) as bigint
-
-            if (participantProjectId !== undefined && Number(participantProjectId) > 0) {
-              participantAddresses.push(addr)
-            }
-          } catch (err) {
-            // User is not a participant in this hackathon
-          }
-
-          // Check if user is a judge
-          try {
-            const judgeTokens = await publicClient.readContract({
-              address: addr,
-              abi: HACKHUB_ABI,
-              functionName: 'judgeTokens',
-              args: [userAddress]
-            }) as bigint
-
-            if (judgeTokens !== undefined && Number(judgeTokens) > 0) {
-              judgeAddresses.push(addr)
-            }
-          } catch (err) {
-            // User is not a judge in this hackathon
-          }
-
-          // Check if user is the organizer
           const owner = await publicClient.readContract({
             address: addr,
             abi: HACKHUB_ABI,
@@ -381,39 +542,107 @@ export default function MyHackathonsPage() {
           }) as string
           
           if (owner.toLowerCase() === userAddress.toLowerCase()) {
-            organizingAddresses.push(addr)
+            filteredOrganizerAddresses.push(addr)
           }
         } catch (err) {
-          console.error(`Error checking user role for ${addr}:`, err)
+          console.error(`Error checking owner for ${addr}:`, err)
         }
       }
 
+      setOrganizingTotal(filteredOrganizerAddresses.length)
+      
+      // Apply pagination to organizing hackathons
+      const organizingEndIndex = Math.min(organizingStartIndex + ITEMS_PER_PAGE, filteredOrganizerAddresses.length)
+      organizingAddresses = filteredOrganizerAddresses.slice(organizingStartIndex, organizingEndIndex)
 
-
-      // Fetch detailed data for all hackathons
+      // Fetch detailed data for hackathons
       const [participatingData, judgingData, organizingData] = await Promise.all([
-        Promise.all(participantAddresses.map((addr, index) => fetchHackathonDetails(addr, index))),
-        Promise.all(judgeAddresses.map((addr, index) => fetchHackathonDetails(addr, index))),
+        Promise.all(participatingAddresses.map((addr, index) => fetchHackathonDetails(addr, index))),
+        Promise.all(judgingAddresses.map((addr, index) => fetchHackathonDetails(addr, index))),
         Promise.all(organizingAddresses.map((addr, index) => fetchHackathonDetails(addr, index)))
       ])
 
-      setParticipatingHackathons(participatingData.filter((h): h is HackathonData => h !== null))
-      setJudgingHackathons(judgingData.filter((h): h is HackathonData => h !== null))
-      setOrganizingHackathons(organizingData.filter((h): h is HackathonData => h !== null))
+      const participatingFiltered = participatingData.filter((h): h is HackathonData => h !== null)
+      const judgingFiltered = judgingData.filter((h): h is HackathonData => h !== null)
+      const organizingFiltered = organizingData.filter((h): h is HackathonData => h !== null)
+
+      setParticipatingHackathons(participatingFiltered)
+      setJudgingHackathons(judgingFiltered)
+      setOrganizingHackathons(organizingFiltered)
+      setLastSyncTime(new Date())
+
+      // Update cache: merge into multi-page stores for smooth client-side paging
+      const existingCache = await hackathonDB.getUserHackathons(userAddress, chainId)
+      const participatingPages = { ...(existingCache?.participatingPages || {}), [participatingPage]: participatingFiltered }
+      const judgingPages = { ...(existingCache?.judgingPages || {}), [judgingPage]: judgingFiltered }
+      const organizingPages = { ...(existingCache?.organizingPages || {}), [organizingPage]: organizingFiltered }
+
+      await hackathonDB.setUserHackathons(userAddress, chainId, {
+        participating: participatingFiltered,
+        judging: judgingFiltered,
+        organizing: organizingFiltered,
+        participatingPages,
+        judgingPages,
+        organizingPages,
+        participatingPage,
+        judgingPage,
+        organizingPage,
+        participatingTotal,
+        judgingTotal,
+        organizingTotal
+      })
 
     } catch (err) {
-      console.error('Error loading user hackathons:', err)
-      setError('Failed to load hackathons from blockchain')
-    } finally {
-      setLoading(false)
+      console.error('Error loading user hackathons from blockchain:', err)
+      throw err // Re-throw to be caught by loadUserHackathons
     }
   }
 
-  // Load data on mount and when user/network changes
+  // Handle sync button click
+  const handleSync = () => {
+    loadUserHackathons(true)
+  }
+
+  // Load data on mount and when user/network/page changes
   useEffect(() => {
     loadUserHackathons()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userAddress, chainId])
+  }, [userAddress, chainId, participatingPage, judgingPage, organizingPage])
+
+  // Reset page to 1 when tab changes
+  useEffect(() => {
+    if (activeTab === 'participating') setParticipatingPage(1)
+    if (activeTab === 'judging') setJudgingPage(1)
+    if (activeTab === 'organizing') setOrganizingPage(1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab])
+
+  // Helper functions for pagination
+  const getCurrentPage = () => {
+    switch (activeTab) {
+      case "participating": return participatingPage
+      case "judging": return judgingPage
+      case "organizing": return organizingPage
+      default: return 1
+    }
+  }
+
+  const getCurrentTotal = () => {
+    switch (activeTab) {
+      case "participating": return participatingTotal
+      case "judging": return judgingTotal
+      case "organizing": return organizingTotal
+      default: return 0
+    }
+  }
+
+  const setCurrentPage = (page: number) => {
+    switch (activeTab) {
+      case "participating": setParticipatingPage(page); break
+      case "judging": setJudgingPage(page); break
+      case "organizing": setOrganizingPage(page); break
+    }
+  }
 
   // Get current data based on active tab
   const getCurrentHackathons = () => {
@@ -424,6 +653,9 @@ export default function MyHackathonsPage() {
       default: return []
     }
   }
+
+  // Note: Backend already handles pagination, so we don't need to slice again
+  // The hackathons arrays already contain the correct items for the current page
 
   const renderParticipatingCard = (hackathon: HackathonData) => {
     const status = getHackathonStatus(hackathon.startTime, hackathon.endTime, hackathon.concluded)
@@ -752,7 +984,7 @@ export default function MyHackathonsPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={loadUserHackathons}
+                onClick={() => loadUserHackathons(true)}
                 className="flex items-center gap-2 border-red-300 text-red-700 hover:bg-red-100"
               >
                 <RefreshCw className="w-4 h-4 text-red-700" />
@@ -766,13 +998,54 @@ export default function MyHackathonsPage() {
   }
 
   const currentHackathons = getCurrentHackathons()
+  const currentTotal = getCurrentTotal()
+  const currentPageNum = getCurrentPage()
+  const calculatedTotalPages = Math.ceil(currentTotal / ITEMS_PER_PAGE)
+  
+  // Debug pagination
+  console.log('MyHackathons pagination debug:', {
+    activeTab,
+    participatingTotal,
+    judgingTotal,
+    organizingTotal,
+    currentTotal,
+    currentPageNum,
+    calculatedTotalPages,
+    participatingPage,
+    judgingPage,
+    organizingPage,
+    currentHackathonsLength: currentHackathons.length,
+    loading
+  })
 
   return (
     <div className="space-y-8">
       <div className="text-center space-y-4">
-        <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
-          My Hackathons
-        </h1>
+        <div className="flex items-center justify-between">
+          <div className="flex-1"></div>
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
+            My Hackathons
+          </h1>
+          <div className="flex-1 flex justify-end">
+            <div className="flex flex-col items-end">
+              <Button
+                onClick={handleSync}
+                disabled={syncing || loading}
+                variant="outline"
+                size="sm"
+                className="border-amber-300 text-amber-700 hover:bg-amber-50 mb-2"
+              >
+                <RotateCcw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                {syncing ? 'Syncing...' : 'Sync'}
+              </Button>
+              {lastSyncTime && (
+                <span className="text-xs text-gray-500">
+                  Last synced: {lastSyncTime.toLocaleTimeString()}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -800,12 +1073,82 @@ export default function MyHackathonsPage() {
         </Button>
       </div>
 
+      {/* Results Info */}
+      {getCurrentTotal() > 0 && (
+        <div className="flex items-center justify-between text-sm text-gray-600">
+          <span>
+            Showing {((getCurrentPage() - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(getCurrentPage() * ITEMS_PER_PAGE, getCurrentTotal())} of {getCurrentTotal()} hackathons
+          </span>
+          <span>
+            Page {getCurrentPage()} of {Math.ceil(getCurrentTotal() / ITEMS_PER_PAGE)}
+          </span>
+        </div>
+      )}
+
       {/* Content */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {activeTab === "participating" && currentHackathons.map(renderParticipatingCard)}
         {activeTab === "judging" && currentHackathons.map(renderJudgingCard)}
         {activeTab === "organizing" && currentHackathons.map(renderOrganizingCard)}
       </div>
+
+      {/* Pagination Controls */}
+      {(calculatedTotalPages > 1 || (!loading && getCurrentPage() > 1)) && (
+        <div className="flex items-center justify-center space-x-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(Math.max(1, getCurrentPage() - 1))}
+            disabled={getCurrentPage() === 1}
+            className="border-amber-300 text-amber-700 hover:bg-amber-50"
+          >
+            <ChevronLeft className="w-4 h-4 mr-1" />
+            Previous
+          </Button>
+          
+          <div className="flex items-center space-x-1">
+            {Array.from({ length: Math.min(5, Math.max(1, calculatedTotalPages)) }, (_, i) => {
+              const totalPages = Math.max(1, calculatedTotalPages)
+              let pageNum
+              if (totalPages <= 5) {
+                pageNum = i + 1
+              } else if (getCurrentPage() <= 3) {
+                pageNum = i + 1
+              } else if (getCurrentPage() >= totalPages - 2) {
+                pageNum = totalPages - 4 + i
+              } else {
+                pageNum = getCurrentPage() - 2 + i
+              }
+              
+              return (
+                <Button
+                  key={pageNum}
+                  variant={getCurrentPage() === pageNum ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={getCurrentPage() === pageNum 
+                    ? "bg-amber-600 text-white hover:bg-amber-700" 
+                    : "border-amber-300 text-amber-700 hover:bg-amber-50"
+                  }
+                >
+                  {pageNum}
+                </Button>
+              )
+            })}
+          </div>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setCurrentPage(Math.min(Math.max(1, calculatedTotalPages), getCurrentPage() + 1))}
+            disabled={getCurrentPage() === Math.max(1, calculatedTotalPages)}
+            className="border-amber-300 text-amber-700 hover:bg-amber-50"
+          >
+            Next
+            <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+      )}
 
       {/* Empty State */}
       {currentHackathons.length === 0 && (
@@ -831,5 +1174,20 @@ export default function MyHackathonsPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function MyHackathonsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="flex items-center space-x-2">
+          <Loader2 className="w-6 h-6 animate-spin" />
+          <span>Loading...</span>
+        </div>
+      </div>
+    }>
+      <MyHackathonsPageContent />
+    </Suspense>
   )
 }

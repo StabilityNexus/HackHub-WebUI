@@ -4,20 +4,21 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent } from "@/components/ui/card"
 
 // Helper function to get the correct image path for GitHub Pages
 const getImagePath = (path: string) => {
   const basePath = process.env.NODE_ENV === 'production' ? '/HackHub-WebUI' : '';
   return `${basePath}${path}`;
 };
-import { HackathonData, getHackathonStatus } from "@/hooks/useHackathons"
+import { HackathonData, getHackathonStatus, getDaysRemaining } from "@/hooks/useHackathons"
 import { getPublicClient } from "@wagmi/core"
 import { config } from "@/utils/config"
 import { getFactoryAddress } from "@/utils/contractAddress"
 import { HACKHUB_FACTORY_ABI } from "@/utils/contractABI/HackHubFactory"
 import { HACKHUB_ABI } from "@/utils/contractABI/HackHub"
 import { formatEther } from "viem"
-import { Search, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff, Calendar, DollarSign, User, ArrowLeft } from "lucide-react"
+import { Search, Loader2, AlertCircle, RefreshCw, Wifi, WifiOff, Calendar, DollarSign, User, ArrowLeft, Trophy, Code, Gavel, Vote, ChevronLeft, ChevronRight, RotateCcw } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useChainId, useAccount } from "wagmi"
 import { Badge } from "@/components/ui/badge"
@@ -25,6 +26,7 @@ import Link from "next/link"
 import { formatUTCTimestamp } from '@/utils/timeUtils'
 import Image from "next/image"
 import { useRouter } from "next/navigation"
+import { hackathonDB } from "@/lib/indexedDB"
 
 interface OrganizerClientProps {
   address: string
@@ -37,11 +39,16 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
   const [hackathons, setHackathons] = useState<HackathonData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalHackathons, setTotalHackathons] = useState(0)
+  const [syncing, setSyncing] = useState(false)
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
   const chainId = useChainId()
   const { isConnected } = useAccount()
   const router = useRouter()
   
   const organizerAddress = address
+  const ITEMS_PER_PAGE = 6
 
   // Network info
   const getNetworkName = (chainId: number) => {
@@ -74,8 +81,8 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
   // Validate organizer address format
   const isValidAddress = organizerAddress && organizerAddress.match(/^0x[a-fA-F0-9]{40}$/)
 
-  // Fetch organizer's hackathons
-  const loadOrganizerHackathons = async () => {
+  // Load organizer's hackathons with cache-first approach
+  const loadOrganizerHackathons = async (forceSync = false) => {
     if (!isValidAddress) {
       setError('Invalid organizer address format')
       setLoading(false)
@@ -83,8 +90,38 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
     }
 
     try {
-      setLoading(true)
+      setLoading(!forceSync) // Don't show loading spinner if it's a sync
+      if (forceSync) setSyncing(true)
       setError(null)
+
+      // Try to load from cache first (unless force syncing)
+      if (!forceSync) {
+        const hasFilters = searchTerm.trim() !== "" || statusFilter !== "All Status"
+        const cacheKey = hasFilters ? `organizer_all_${organizerAddress}` : `organizer_page_${organizerAddress}_${currentPage}`
+        const cachedData = await hackathonDB.getOrganizerHackathons(organizerAddress, chainId)
+        if (cachedData) {
+          setHackathons(cachedData.hackathons)
+          setTotalHackathons(cachedData.totalHackathons)
+          setLoading(false)
+          setLastSyncTime(new Date())
+          return
+        }
+      }
+
+      // Fetch from blockchain
+      await fetchOrganizerDataFromBlockchain()
+    } catch (err) {
+      console.error('Error loading organizer hackathons:', err)
+      setError('Failed to load hackathons from blockchain')
+    } finally {
+      setLoading(false)
+      setSyncing(false)
+    }
+  }
+
+  // Fetch organizer's hackathons from blockchain
+  const fetchOrganizerDataFromBlockchain = async () => {
+    try {
 
       const publicClient = getPublicClient(config)
       const factoryAddress = getFactoryAddress(chainId)
@@ -129,9 +166,48 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
         return
       }
 
-      // Filter and fetch hackathons by organizer
-      const organizerHackathons: HackathonData[] = []
+      // Filter hackathons by organizer first to get total count
+      const organizerAddresses: `0x${string}`[] = []
       for (const addr of allAddresses) {
+        try {
+          const owner = await publicClient.readContract({
+            address: addr,
+            abi: HACKHUB_ABI,
+            functionName: 'owner'
+          }) as string
+          
+          if (owner.toLowerCase() === organizerAddress.toLowerCase()) {
+            organizerAddresses.push(addr)
+          }
+        } catch (err) {
+          console.error(`Error checking owner for ${addr}:`, err)
+        }
+      }
+
+      setTotalHackathons(organizerAddresses.length)
+
+      if (organizerAddresses.length === 0) {
+        setHackathons([])
+        return
+      }
+
+      // Check if we need to fetch all data (for client-side filtering) or paginated data
+      const needsAllData = searchTerm.trim() !== "" || statusFilter !== "All Status"
+      
+      let startIndex = 0
+      let endIndex = organizerAddresses.length
+      
+      if (!needsAllData) {
+        // Only paginate at blockchain level if no filters are active
+        startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+        endIndex = Math.min(startIndex + ITEMS_PER_PAGE, organizerAddresses.length)
+      }
+      
+      const paginatedAddresses = organizerAddresses.slice(startIndex, endIndex)
+
+      // Fetch detailed data for paginated hackathons
+      const organizerHackathons: HackathonData[] = []
+      for (const addr of paginatedAddresses) {
         try {
           const [
             owner,
@@ -140,7 +216,6 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
             startTime,
             endDate,
             endTime,
-            prizePool,
             totalTokens,
             concluded,
             factory,
@@ -154,7 +229,6 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startTime' }) as Promise<bigint>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'endDate' }) as Promise<string>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'endTime' }) as Promise<bigint>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'prizePool' }) as Promise<bigint>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'totalTokens' }) as Promise<bigint>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'concluded' }) as Promise<boolean>,
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'factory' }) as Promise<string>,
@@ -163,7 +237,6 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
             publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'imageURL' }) as Promise<string>,
           ])
           
-          if (owner.toLowerCase() === organizerAddress.toLowerCase()) {
             const hackathon: HackathonData = {
               id: organizerHackathons.length,
               contractAddress: addr,
@@ -172,7 +245,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
               startTime: Number(startTime),
               endDate: Number(endDate),
               endTime: Number(endTime),
-              prizePool: formatEther(prizePool),
+              prizePool: '0',
               totalTokens: Number(totalTokens),
               concluded,
               organizer: owner,
@@ -182,30 +255,50 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
               judges: [],
               projects: [],
               image: imageURL || getImagePath("/block.png"),
-            }
-            organizerHackathons.push(hackathon)
+            description: `Web3 Hackathon with sponsored multi-token prize pool`,
           }
+          organizerHackathons.push(hackathon)
         } catch (err) {
           console.error(`Error fetching hackathon ${addr}:`, err)
         }
       }
 
       setHackathons(organizerHackathons)
+      setLastSyncTime(new Date())
+      
+      // Update cache
+      await hackathonDB.setOrganizerHackathons(organizerAddress, chainId, {
+        hackathons: organizerHackathons,
+        totalHackathons: organizerAddresses.length
+      })
     } catch (err) {
-      console.error('Error loading organizer hackathons:', err)
-      setError('Failed to load hackathons from blockchain')
-    } finally {
-      setLoading(false)
+      console.error('Error loading organizer hackathons from blockchain:', err)
+      throw err // Re-throw to be caught by loadOrganizerHackathons
     }
   }
 
-  // Initial load & reload on network change
+  // Handle sync button click
+  const handleSync = () => {
+    loadOrganizerHackathons(true)
+  }
+
+  // Helper function to format prize amounts
+  const formatPrizeAmount = (_hackathon: HackathonData) => {
+    return "Sponsored multi-token pool"
+  }
+
+  // Initial load & reload on network change and page change
   useEffect(() => {
     if (isValidAddress) {
       loadOrganizerHackathons()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chainId, organizerAddress])
+  }, [chainId, organizerAddress, currentPage])
+
+  // Reset to first page when search/filter changes
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, statusFilter])
 
   const filteredHackathons = hackathons.filter(hackathon => {
     // Search filter
@@ -226,9 +319,104 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
     const statusA = getHackathonStatus(a.startTime, a.endTime, a.concluded)
     const statusB = getHackathonStatus(b.startTime, b.endTime, b.concluded)
     
-    const statusPriority = { 'accepting-submissions': 0, 'upcoming': 1, 'judging-submissions': 2, 'concluded': 3 }
-    return statusPriority[statusA] - statusPriority[statusB]
+    const statusPriority: Record<string, number> = { 'accepting-submissions': 0, 'upcoming': 1, 'judging-submissions': 2, 'concluded': 3 }
+    return (statusPriority[statusA] || 3) - (statusPriority[statusB] || 3)
   })
+
+  // Check if we have active filters
+  const hasActiveFilters = searchTerm.trim() !== "" || statusFilter !== "All Status"
+  
+  // Calculate pagination info based on whether filters are active
+  const effectiveTotal = hasActiveFilters ? filteredHackathons.length : totalHackathons
+  const totalPages = Math.ceil(effectiveTotal / ITEMS_PER_PAGE)
+  
+  // For display: if filters are active, paginate the filtered results client-side
+  const displayHackathons = hasActiveFilters 
+    ? sortedHackathons.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE)
+    : sortedHackathons // Already paginated at blockchain level
+
+  const startItem = (currentPage - 1) * ITEMS_PER_PAGE + 1
+  const endItem = Math.min(currentPage * ITEMS_PER_PAGE, effectiveTotal)
+
+  // Render organizing card (from myHackathons page design)
+  const renderOrganizingCard = (hackathon: HackathonData) => {
+    const status = getHackathonStatus(hackathon.startTime, hackathon.endTime, hackathon.concluded)
+
+    return (
+      <Card key={hackathon.id} className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-white">
+        <CardContent className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <h3 className="text-xl font-bold mb-2 text-gray-800">{hackathon.hackathonName}</h3>
+                <p className="text-muted-foreground text-sm text-gray-600">{hackathon.description}</p>
+              </div>
+              <Badge className="bg-green-100 text-green-800 hover:bg-green-200">
+                Organizing
+              </Badge>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex items-center gap-2">
+                <Trophy className="w-4 h-4 text-[#8B6914]" />
+                <span className="font-semibold text-[#8B6914]">{formatPrizeAmount(hackathon)}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Code className="w-4 h-4 text-[#8B6914]" />
+                <span className="text-sm text-gray-600">{hackathon.projectCount} projects</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Gavel className="w-4 h-4 text-[#8B6914]" />
+                <span className="text-sm text-gray-600">{hackathon.judgeCount} judges</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Vote className="w-4 h-4 text-[#8B6914]" />
+                <span className="text-sm text-gray-600">{hackathon.totalTokens} total tokens</span>
+              </div>
+            </div>
+
+            <div className="bg-yellow-50 p-3 rounded-lg border">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-800">Contract Status</span>
+                <span className="text-sm text-gray-600">
+                  {hackathon.concluded ? "Concluded" : "Active"}
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                {hackathon.contractAddress.slice(0, 10)}...{hackathon.contractAddress.slice(-6)}
+              </p>
+            </div>
+            
+            <div className="flex items-center justify-between pt-2">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-[#8B6914]" />
+                <span className="text-sm text-gray-600">
+                  {status === 'accepting-submissions' ? 'Accepting submissions' : 
+                   status === 'upcoming' ? 'Not started' : 
+                   status === 'judging-submissions' ? 'Judging Submissions' : 'Concluded'}
+                </span>
+              </div>
+              
+              <div className="flex gap-2">
+                {(status === 'judging-submissions' || status === 'accepting-submissions') && (
+                  <Link href={`/manage?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}>
+                    <Button size="sm" className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white">
+                      Manage
+                    </Button>
+                  </Link>
+                )}
+                <Link href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}>
+                  <Button size="sm" variant="outline" className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none">
+                    View Details
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (!isValidAddress) {
     return (
@@ -351,7 +539,7 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
                 </p>
               )}
             </div>
-            <Button variant="outline" size="sm" onClick={loadOrganizerHackathons}>
+            <Button variant="outline" size="sm" onClick={() => loadOrganizerHackathons(true)}>
               <RefreshCw className="w-4 h-4 mr-2" />
               Retry
             </Button>
@@ -378,7 +566,23 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
           Organizer's Events
         </h1>
         
-        <div className="w-20"></div> {/* Spacer to center the title */}
+        <div className="flex flex-col items-end">
+          <Button
+            onClick={handleSync}
+            disabled={syncing || loading}
+            variant="outline"
+            size="sm"
+            className="border-amber-300 text-amber-700 hover:bg-amber-50 mb-2"
+          >
+            <RotateCcw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync'}
+          </Button>
+          {lastSyncTime && (
+            <span className="text-xs text-gray-500">
+              Last synced: {lastSyncTime.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
       </div>
       
       <div className="text-center space-y-4">
@@ -425,189 +629,80 @@ export default function OrganizerClient({ address }: OrganizerClientProps) {
             </div>
           </div>
 
+          {/* Results Info */}
+          {effectiveTotal > 0 && (
+            <div className="flex items-center justify-between text-sm text-gray-600">
+              <span>
+                Showing {startItem}-{endItem} of {effectiveTotal} hackathons
+                {hasActiveFilters && ` (filtered from ${totalHackathons} total)`}
+              </span>
+              <span>
+                Page {currentPage} of {totalPages}
+              </span>
+            </div>
+          )}
+
           {/* Hackathons List */}
-          <div className="space-y-8">
-            {/* Ongoing Hackathons */}
-            {sortedHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'accepting-submissions').length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-amber-800 border-b border-amber-200 pb-2">
-                  🔥 Ongoing Hackathons
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {sortedHackathons
-                    .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'accepting-submissions')
-                    .map((hackathon) => {
-                      const status = getHackathonStatus(hackathon.startTime, hackathon.endTime, hackathon.concluded)
-                      return (
-                        <Link 
-                          key={hackathon.contractAddress} 
-                          href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}
-                          className="block"
-                        >
-                          <div className="bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative h-full">
-                            {/* Gradient background overlay based on status */}
-                            <div className={`absolute inset-0 transition-all duration-300 ${
-                              status === 'accepting-submissions' 
-                                ? 'bg-gradient-to-b from-amber-50/60 via-orange-50/30 to-amber-50/60 group-hover:from-amber-100/60 group-hover:via-orange-100/30 group-hover:to-amber-100/60'
-                                : status === 'upcoming' 
-                                ? 'bg-gradient-to-b from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
-                                : status === 'judging-submissions'
-                                ? 'bg-gradient-to-b from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
-                                : 'bg-gradient-to-b from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
-                            }`}></div>
-                            
-                            <div className="relative z-10 p-6 flex flex-col h-full">
-                              {/* Top section - Image */}
-                              <div className="flex justify-center mb-4">
-                                <div className="h-20 w-20 relative group-hover:scale-105 transition-transform duration-300">
-                                  <Image
-                                    src={hackathon.image || getImagePath("/block.png")}
-                                    alt="Hackathon Image"
-                                    width={80}
-                                    height={80}
-                                    className="h-full w-full object-contain rounded-lg"
-                                    priority
-                                    onError={(e) => {
-                                      // Fallback to block.png if custom image fails to load
-                                      const target = e.target as HTMLImageElement;
-                                      target.src = getImagePath("/block.png");
-                                    }}
-                                  />
-                                </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {displayHackathons.map(renderOrganizingCard)}
                               </div>
 
-                              {/* Title */}
-                              <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-700 transition-colors text-center mb-3 line-clamp-2">
-                                {hackathon.hackathonName}
-                              </h3>
-
-                              {/* Status Badge */}
-                              <div className="flex justify-center mb-4">
-                                <Badge className={`text-xs font-medium px-3 py-1 bg-orange-100 text-orange-800 border-orange-200 shadow-sm`}>
-                                  🔥 {status === 'accepting-submissions' ? 'ACCEPTING SUBMISSIONS' : 
-                                       status === 'judging-submissions' ? 'JUDGING SUBMISSIONS' :
-                                       status === 'upcoming' ? 'UPCOMING' : 'CONCLUDED'}
-                                </Badge>
-                              </div>
-
-                              {/* Date */}
-                              <div className="flex items-center justify-center gap-2 text-gray-600 mb-3">
-                                <Calendar className="w-4 h-4" />
-                                <span className="text-xs font-medium text-center">
-                                  {formatDate(hackathon.startTime)}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-center gap-2 text-gray-600 mb-4">
-                                <span className="text-xs font-medium text-center">
-                                  to {formatDate(hackathon.endTime)}
-                                </span>
-                              </div>
-
-                              {/* Prize - Push to bottom */}
-                              <div className="mt-auto">
-                                <div className="flex items-center justify-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-2 rounded-full border border-amber-200">
-                                  <DollarSign className="w-4 h-4" />
-                                  <span className="text-sm">{parseFloat(hackathon.prizePool).toFixed(2)} ETH</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      )
-                    })}
-                </div>
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-center space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+                className="border-amber-300 text-amber-700 hover:bg-amber-50"
+              >
+                <ChevronLeft className="w-4 h-4 mr-1" />
+                Previous
+              </Button>
+              
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum
+                  if (totalPages <= 5) {
+                    pageNum = i + 1
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i
+                  } else {
+                    pageNum = currentPage - 2 + i
+                  }
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={currentPage === pageNum 
+                        ? "bg-amber-600 text-white hover:bg-amber-700" 
+                        : "border-amber-300 text-amber-700 hover:bg-amber-50"
+                      }
+                    >
+                      {pageNum}
+                    </Button>
+                  )
+                })}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+                className="border-amber-300 text-amber-700 hover:bg-amber-50"
+              >
+                Next
+                <ChevronRight className="w-4 h-4 ml-1" />
+              </Button>
               </div>
             )}
-
-            {/* Other Hackathons */}
-            {sortedHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'accepting-submissions').length > 0 && (
-              <div className="space-y-4">
-                <h2 className="text-2xl font-bold text-gray-700 border-b border-gray-200 pb-2">
-                  Upcoming & Past Hackathons
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {sortedHackathons
-                    .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'accepting-submissions')
-                    .map((hackathon) => {
-                      const status = getHackathonStatus(hackathon.startTime, hackathon.endTime, hackathon.concluded)
-                      return (
-                        <Link 
-                          key={hackathon.contractAddress} 
-                          href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}
-                          className="block"
-                        >
-                          <div className="bg-white border border-amber-100 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer group relative h-full">
-                            {/* Gradient background overlay based on status */}
-                            <div className={`absolute inset-0 transition-all duration-300 ${
-                              status === 'upcoming' 
-                                ? 'bg-gradient-to-b from-blue-50/60 via-indigo-50/30 to-blue-50/60 group-hover:from-blue-100/60 group-hover:via-indigo-100/30 group-hover:to-blue-100/60'
-                                : status === 'judging-submissions'
-                                ? 'bg-gradient-to-b from-orange-50/60 via-amber-50/30 to-orange-50/60 group-hover:from-orange-100/60 group-hover:via-amber-100/30 group-hover:to-orange-100/60'
-                                : 'bg-gradient-to-b from-gray-50/60 via-slate-50/30 to-gray-50/60 group-hover:from-gray-100/60 group-hover:via-slate-100/30 group-hover:to-gray-100/60'
-                            }`}></div>
-                            
-                            <div className="relative z-10 p-6 flex flex-col h-full">
-                              {/* Top section - Image */}
-                              <div className="flex justify-center mb-4">
-                                <div className="h-20 w-20 relative group-hover:scale-105 transition-transform duration-300">
-                                  <Image
-                                    src={hackathon.image || getImagePath("/block.png")}
-                                    alt="Hackathon Image"
-                                    width={80}
-                                    height={80}
-                                    className="h-full w-full object-contain rounded-lg"
-                                    priority
-                                    onError={(e) => {
-                                      // Fallback to block.png if custom image fails to load
-                                      const target = e.target as HTMLImageElement;
-                                      target.src = getImagePath("/block.png");
-                                    }}
-                                  />
-                                </div>
-                              </div>
-
-                              {/* Title */}
-                              <h3 className="text-lg font-semibold text-gray-900 group-hover:text-amber-700 transition-colors text-center mb-3 line-clamp-2">
-                                {hackathon.hackathonName}
-                              </h3>
-
-                              {/* Status Badge */}
-                              <div className="flex justify-center mb-4">
-                                <Badge className={`text-xs font-medium px-3 py-1 ${getStatusColor(status)} shadow-sm`}>
-                                  {status === 'upcoming' ? 'UPCOMING' : 
-                                   status === 'judging-submissions' ? 'JUDGING SUBMISSIONS' : 'CONCLUDED'}
-                                </Badge>
-                              </div>
-
-                              {/* Date */}
-                              <div className="flex items-center justify-center gap-2 text-gray-600 mb-3">
-                                <Calendar className="w-4 h-4" />
-                                <span className="text-xs font-medium text-center">
-                                  {formatDate(hackathon.startTime)}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-center gap-2 text-gray-600 mb-4">
-                                <span className="text-xs font-medium text-center">
-                                  to {formatDate(hackathon.endTime)}
-                                </span>
-                              </div>
-
-                              {/* Prize - Push to bottom */}
-                              <div className="mt-auto">
-                                <div className="flex items-center justify-center gap-2 text-amber-700 font-bold bg-amber-50 px-3 py-2 rounded-full border border-amber-200">
-                                  <DollarSign className="w-4 h-4" />
-                                  <span className="text-sm">{parseFloat(hackathon.prizePool).toFixed(2)} ETH</span>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </Link>
-                      )
-                    })}
-                </div>
-              </div>
-            )}
-          </div>
         </>
       )}
 

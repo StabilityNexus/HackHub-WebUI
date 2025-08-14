@@ -14,12 +14,14 @@ import { HACKHUB_FACTORY_ABI } from "@/utils/contractABI/HackHubFactory"
 import { HACKHUB_ABI } from "@/utils/contractABI/HackHub"
 import { formatEther } from "viem"
 import { useChainId } from "wagmi"
+import { hackathonDB } from "@/lib/indexedDB"
 import {
   Code,
   Plus,
   Zap,
   DollarSign,
-  ChevronDown
+  ChevronDown,
+  RefreshCw
 } from "lucide-react"
 
 // Helper function to get the correct image path for GitHub Pages
@@ -32,127 +34,157 @@ export default function HomePage() {
   const [recentHackathons, setRecentHackathons] = useState<HackathonData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [lastSyncTime, setLastSyncTime] = useState<Date | null>(null)
   const chainId = useChainId()
 
-  // Fetch recent hackathons from blockchain
-  const fetchRecentHackathons = async () => {
+  // Load recent hackathons from cache first, then blockchain if needed
+  const loadRecentHackathons = async (forceSync = false) => {
     try {
-      setLoading(true)
+      setLoading(!forceSync) // Don't show loading spinner if it's a sync
+      if (forceSync) setSyncing(true)
       setError(null)
 
-      const publicClient = getPublicClient(config)
-      const factoryAddress = getFactoryAddress(chainId)
-
-      if (!factoryAddress) {
-        setError(`Factory contract not deployed on network ${chainId}`)
-        setRecentHackathons([])
-        return
-      }
-
-      // Get ongoing count only
-      const [ongoingCount] = await publicClient.readContract({
-        address: factoryAddress,
-        abi: HACKHUB_FACTORY_ABI,
-        functionName: 'getCounts',
-      }) as [bigint, bigint]
-
-      const ongoing = Number(ongoingCount)
-      const maxHackathons = Math.min(ongoing, 10)
-
-      if (maxHackathons === 0) {
-        setRecentHackathons([])
-        return
-      }
-
-      // Get ongoing hackathons from 0 to maxHackathons
-      const addresses = await publicClient.readContract({
-        address: factoryAddress,
-        abi: HACKHUB_FACTORY_ABI,
-        functionName: 'getHackathons',
-        args: [BigInt(0), BigInt(maxHackathons - 1), true],
-      }) as `0x${string}`[]
-
-      if (addresses.length === 0) {
-        setRecentHackathons([])
-        return
-      }
-
-      // Fetch hackathon details
-      const hackathonPromises = addresses.map(async (addr, index) => {
-        try {
-          const [
-            name,
-            startDate,
-            startTime,
-            endDate,
-            endTime,
-            prizePool,
-            totalTokens,
-            concluded,
-            organizer,
-            projectCount,
-            imageURL,
-          ] = await Promise.all([
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'name' }) as Promise<string>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startDate' }) as Promise<string>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startTime' }) as Promise<bigint>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'endDate' }) as Promise<string>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'endTime' }) as Promise<bigint>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'prizePool' }) as Promise<bigint>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'totalTokens' }) as Promise<bigint>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'concluded' }) as Promise<boolean>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'owner' }) as Promise<string>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'projectCount' }) as Promise<bigint>,
-            publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'imageURL' }) as Promise<string>,
-          ])
-
-          const hackathon: HackathonData = {
-            id: index,
-            contractAddress: addr,
-            hackathonName: name,
-            startDate: Number(startDate),
-            startTime: Number(startTime),
-            endDate: Number(endDate),
-            endTime: Number(endTime),
-            prizePool: formatEther(prizePool),
-            totalTokens: Number(totalTokens),
-            concluded,
-            organizer,
-            factory: '',
-            judgeCount: 0,
-            projectCount: Number(projectCount),
-            judges: [],
-            projects: [],
-            description: `Web3 Hackathon with ${formatEther(prizePool)} ETH prize pool`,
-            image: imageURL || "/placeholder.svg?height=200&width=400",
-            tags: ["Web3", "Blockchain"],
-          }
-
-          return hackathon
-        } catch (err) {
-          console.error(`Error fetching hackathon ${addr}:`, err)
-          return null
+      // Try to load from cache first (unless force syncing)
+      if (!forceSync) {
+        const cachedData = await hackathonDB.getHackathons('recent_home', chainId)
+        if (cachedData && cachedData.length > 0) {
+          setRecentHackathons(cachedData)
+          setLoading(false)
+          setLastSyncTime(new Date())
+          return
         }
-      })
+      }
 
-      const results = await Promise.all(hackathonPromises)
-      const validHackathons = results.filter((h): h is HackathonData => h !== null)
-
-      // Sort by start time ascending (earliest first, since we're fetching from index 0)
-      const sortedHackathons = validHackathons.sort((a, b) => a.startTime - b.startTime)
-      
-      setRecentHackathons(sortedHackathons)
+      // Fetch from blockchain
+      await fetchFromBlockchain()
     } catch (err) {
       console.error('Error loading recent hackathons:', err)
       setError('Failed to load recent hackathons')
     } finally {
       setLoading(false)
+      setSyncing(false)
     }
+  }
+
+  // Fetch recent hackathons from blockchain
+  const fetchFromBlockchain = async () => {
+    const publicClient = getPublicClient(config)
+    const factoryAddress = getFactoryAddress(chainId)
+
+    if (!factoryAddress) {
+      setError(`Factory contract not deployed on network ${chainId}`)
+      setRecentHackathons([])
+      return
+    }
+
+    // Get ongoing count only
+    const [ongoingCount] = await publicClient.readContract({
+      address: factoryAddress,
+      abi: HACKHUB_FACTORY_ABI,
+      functionName: 'getCounts',
+    }) as [bigint, bigint]
+
+    const ongoing = Number(ongoingCount)
+    const maxHackathons = Math.min(ongoing, 10)
+
+    if (maxHackathons === 0) {
+      setRecentHackathons([])
+      await hackathonDB.setHackathons('recent_home', chainId, [])
+      return
+    }
+
+    // Get ongoing hackathons from 0 to maxHackathons
+    const addresses = await publicClient.readContract({
+      address: factoryAddress,
+      abi: HACKHUB_FACTORY_ABI,
+      functionName: 'getHackathons',
+      args: [BigInt(0), BigInt(maxHackathons - 1), true],
+    }) as `0x${string}`[]
+
+    if (addresses.length === 0) {
+      setRecentHackathons([])
+      await hackathonDB.setHackathons('recent_home', chainId, [])
+      return
+    }
+
+    // Fetch hackathon details
+    const hackathonPromises = addresses.map(async (addr, index) => {
+      try {
+        const [
+          name,
+          startDate,
+          startTime,
+          endDate,
+          endTime,
+          totalTokens,
+          concluded,
+          organizer,
+          projectCount,
+          imageURL,
+        ] = await Promise.all([
+          publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'name' }) as Promise<string>,
+          publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startDate' }) as Promise<string>,
+          publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'startTime' }) as Promise<bigint>,
+          publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'endDate' }) as Promise<string>,
+          publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'endTime' }) as Promise<bigint>,
+          publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'totalTokens' }) as Promise<bigint>,
+          publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'concluded' }) as Promise<boolean>,
+          publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'owner' }) as Promise<string>,
+          publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'projectCount' }) as Promise<bigint>,
+          publicClient.readContract({ address: addr, abi: HACKHUB_ABI, functionName: 'imageURL' }) as Promise<string>,
+        ])
+
+        const hackathon: HackathonData = {
+          id: index,
+          contractAddress: addr,
+          hackathonName: name,
+          startDate: Number(startDate),
+          startTime: Number(startTime),
+          endDate: Number(endDate),
+          endTime: Number(endTime),
+          prizePool: '0',
+          totalTokens: Number(totalTokens),
+          concluded,
+          organizer,
+          factory: '',
+          judgeCount: 0,
+          projectCount: Number(projectCount),
+          judges: [],
+          projects: [],
+          description: `Web3 Hackathon with sponsored multi-token prize pool`,
+          image: imageURL || "/placeholder.svg?height=200&width=400",
+          tags: ["Web3", "Blockchain"],
+        }
+
+        return hackathon
+      } catch (err) {
+        console.error(`Error fetching hackathon ${addr}:`, err)
+        return null
+      }
+    })
+
+    const results = await Promise.all(hackathonPromises)
+    const validHackathons = results.filter((h): h is HackathonData => h !== null)
+
+    // Sort by start time ascending (earliest first, since we're fetching from index 0)
+    const sortedHackathons = validHackathons.sort((a, b) => a.startTime - b.startTime)
+    
+    setRecentHackathons(sortedHackathons)
+    setLastSyncTime(new Date())
+    
+    // Update cache
+    await hackathonDB.setHackathons('recent_home', chainId, sortedHackathons)
+  }
+
+  // Handle sync button click
+  const handleSync = () => {
+    loadRecentHackathons(true)
   }
 
   // Load hackathons on component mount and chain change
   useEffect(() => {
-    fetchRecentHackathons()
+    loadRecentHackathons()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chainId])
 
@@ -240,14 +272,37 @@ export default function HomePage() {
                 <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-amber-300 to-orange-300 rounded-full opacity-50"></div>
                 
                 <div className="relative z-10 mt-">
-                  <h2 className="text-4xl lg:text-5xl font-black leading-tight">
-                    <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700">
-                      Think. Build. Innovate.
-                    </span>
-                  </h2>
-                  
-                  {/* Accent line */}
-                  <div className="mt-6 w-20 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg"></div>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-4xl lg:text-5xl font-black leading-tight">
+                        <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700">
+                          Think. Build. Innovate.
+                        </span>
+                      </h2>
+                      
+                      {/* Accent line */}
+                      <div className="mt-6 w-20 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg"></div>
+                    </div>
+                    
+                    {/* Sync Button */}
+                    <div className="flex flex-col items-end">
+                      <Button
+                        onClick={handleSync}
+                        disabled={syncing || loading}
+                        variant="outline"
+                        size="sm"
+                        className="border-amber-300 text-amber-700 hover:bg-amber-50 mb-2"
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+                        {syncing ? 'Syncing...' : 'Sync'}
+                      </Button>
+                      {lastSyncTime && (
+                        <span className="text-xs text-gray-500">
+                          Last synced: {lastSyncTime.toLocaleTimeString()}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
               
@@ -328,7 +383,7 @@ export default function HomePage() {
                   <div className="bg-red-50/80 rounded-lg p-6 max-w-md">
                     <p className="font-medium text-red-600">{error}</p>
                     <Button 
-                      onClick={fetchRecentHackathons} 
+                      onClick={() => loadRecentHackathons(true)} 
                       variant="outline" 
                       className="mt-4"
                     >
