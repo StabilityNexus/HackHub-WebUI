@@ -68,6 +68,8 @@ export default function InteractionClient() {
   const [hackathonData, setHackathonData] = useState<HackathonData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [syncing, setSyncing] = useState(false)
+  const [lastSynced, setLastSynced] = useState<Date | null>(null)
   const [submissionOpen, setSubmissionOpen] = useState(false)
   const [approvedTokens, setApprovedTokens] = useState<string[]>([])
   const [tokenMinAmounts, setTokenMinAmounts] = useState<Record<string, bigint>>({})
@@ -137,26 +139,31 @@ export default function InteractionClient() {
 
   const short = (addr: string) => `${addr.slice(0,6)}...${addr.slice(-4)}`
 
-  // Format token amounts to whole numbers considering decimals
+  // Format token amounts for display - convert from base units to human-readable
   const formatTokenAmount = (amount: bigint, token: string): string => {
-    console.log(`Formatting amount ${amount.toString()} for token ${token}`)
     if (token === '0x0000000000000000000000000000000000000000') {
-      // ETH - convert from wei to ether and show as whole number
+      // ETH - convert from wei to ether for display
       const result = Math.floor(Number(formatEther(amount))).toString()
-      console.log(`ETH result: ${result}`)
       return result
     } else {
-      // ERC20 - convert using token decimals
+      // ERC20 - convert using token decimals for display
       const decimals = tokenDecimals[token] ?? 18
       const divisor = BigInt(10) ** BigInt(decimals)
       const wholeTokens = amount / divisor
       const result = wholeTokens.toString()
-      console.log(`ERC20 result: ${result} (decimals: ${decimals})`)
       return result
     }
   }
 
 
+
+  // Manual sync function for the sync button
+  const handleSync = async () => {
+    setSyncing(true)
+    setError(null)
+    await fetchHackathonData()
+    setSyncing(false)
+  }
 
   // Fetch hackathon data from contract
   const fetchHackathonData = async () => {
@@ -233,6 +240,7 @@ export default function InteractionClient() {
           try {
             if (t === '0x0000000000000000000000000000000000000000') {
               symbols[t] = 'ETH'
+              decimalsMap[t] = 18 // ETH has 18 decimals
             } else {
               const sym = await publicClient.readContract({ address: t as `0x${string}`, abi: ERC20_ABI, functionName: 'symbol' }) as string
               symbols[t] = sym
@@ -243,6 +251,9 @@ export default function InteractionClient() {
             }
           } catch {
             symbols[t] = t === '0x0000000000000000000000000000000000000000' ? 'ETH' : short(t)
+            if (t === '0x0000000000000000000000000000000000000000') {
+              decimalsMap[t] = 18 // ETH has 18 decimals
+            }
           }
         }
         console.log('📊 Setting tokenMinAmounts state:', mins)
@@ -474,6 +485,7 @@ export default function InteractionClient() {
       }
 
       setHackathonData(hackathon)
+      setLastSynced(new Date())
       try {
         await hackathonDB.setHackathonDetails(contractAddress, chainId, hackathon)
       } catch {}
@@ -564,18 +576,38 @@ export default function InteractionClient() {
 
 
 
-  // Load data on mount: cache-first then refresh
+  // Load data on mount: cache-first, only fetch from blockchain if no cache or error
   useEffect(() => {
     const load = async () => {
       if (!contractAddress) return
+      
+      let shouldFetchFromBlockchain = false
+      
       try {
         const cached = await hackathonDB.getHackathonDetails(contractAddress, chainId)
         if (cached) {
           setHackathonData(cached)
+          // Set last synced from cache timestamp
+          if ((cached as any).timestamp) {
+            setLastSynced(new Date((cached as any).timestamp))
+          }
           setLoading(false)
+          // Successfully loaded from cache, no need to fetch from blockchain
+          return
+        } else {
+          // No cached data found, need to fetch from blockchain
+          shouldFetchFromBlockchain = true
         }
-      } catch {}
-      fetchHackathonData()
+      } catch (error) {
+        console.warn('Error loading from IndexedDB cache:', error)
+        // Cache error, need to fetch from blockchain
+        shouldFetchFromBlockchain = true
+      }
+      
+      // Only fetch from blockchain if no cache data or cache error
+      if (shouldFetchFromBlockchain) {
+        await fetchHackathonData()
+      }
     }
     load()
   }, [contractAddress, chainId])
@@ -961,6 +993,30 @@ export default function InteractionClient() {
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500"></div>
       </div>
 
+      {/* Sync Controls */}
+      <div className="flex items-center justify-between bg-white rounded-lg border p-4 shadow-sm">
+        <div className="flex items-center gap-4">
+          <Button
+            onClick={handleSync}
+            disabled={syncing || loading}
+            className="bg-[#8B6914] text-white hover:bg-[#A0471D] flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
+            {syncing ? 'Syncing...' : 'Sync'}
+          </Button>
+          
+          {lastSynced && (
+            <div className="text-sm text-muted-foreground">
+              Last synced: {lastSynced.toLocaleString()}
+            </div>
+          )}
+        </div>
+        
+        <div className="text-sm text-muted-foreground">
+          Data refreshes automatically and is cached locally
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
@@ -1062,15 +1118,10 @@ export default function InteractionClient() {
                         <div>Total: {formatTokenAmount(tokenTotals[t] ?? BigInt(0), t)}</div>
                         <div>Min deposit: {(() => {
                           const minAmount = tokenMinAmounts[t]
-                          console.log(`🔍 Display check for token ${t}:`, {
-                            minAmount: minAmount?.toString(),
-                            exists: !!minAmount,
-                            greaterThanZero: minAmount && minAmount > BigInt(0),
-                            allMinAmounts: Object.keys(tokenMinAmounts).map(k => ({ token: k, amount: tokenMinAmounts[k]?.toString() }))
-                          })
-                          return minAmount && minAmount > BigInt(0) 
-                            ? formatTokenAmount(minAmount, t)
-                            : 'No minimum'
+                          if (minAmount !== undefined && minAmount > BigInt(0)) {
+                            return formatTokenAmount(minAmount, t)
+                          }
+                          return 'No minimum'
                         })()}</div>
                       </div>
                     </div>
@@ -1213,7 +1264,7 @@ export default function InteractionClient() {
                 ))}
               </select>
               <Label className="text-sm">Amount</Label>
-              <Input value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder={isERC20Selected ? 'Amount in smallest units' : '0.0 (ETH)'} className="bg-white border-gray-300 text-black" />
+              <Input value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder={isERC20Selected ? 'Amount (e.g., 100)' : 'Amount in ETH (e.g., 0.5)'} className="bg-white border-gray-300 text-black" />
               {isERC20Selected && (
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-xs text-gray-600">
@@ -1234,7 +1285,7 @@ export default function InteractionClient() {
               {depositToken && tokenMinAmounts[depositToken] !== undefined && (
                 <p className="text-xs text-gray-600">
                   Min amount to be listed: {
-                    tokenMinAmounts[depositToken] > BigInt(0) 
+                    tokenMinAmounts[depositToken] !== undefined && tokenMinAmounts[depositToken] > BigInt(0) 
                       ? formatTokenAmount(tokenMinAmounts[depositToken], depositToken)
                       : 'No minimum required'
                   }

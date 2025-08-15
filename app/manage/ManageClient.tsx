@@ -134,11 +134,33 @@ export default function ManageHackathonPage() {
     }
     try {
       setApprovingToken(prev => ({ ...prev, [token]: true }))
+      
+      // Convert human-readable amount to base units (wei for ETH, smallest units for ERC20)
+      let minAmountInBaseUnits: bigint
+      if (token === '0x0000000000000000000000000000000000000000') {
+        // ETH - convert to wei (18 decimals)
+        minAmountInBaseUnits = BigInt(min) * BigInt(10) ** BigInt(18)
+      } else {
+        // ERC20 - get decimals and convert to base units
+        try {
+          const publicClient = getPublicClient(config)
+          const decimals = await publicClient.readContract({ 
+            address: token as `0x${string}`, 
+            abi: ERC20_ABI, 
+            functionName: 'decimals' 
+          }) as number
+          minAmountInBaseUnits = BigInt(min) * BigInt(10) ** BigInt(decimals)
+        } catch {
+          // Default to 18 decimals if we can't get token decimals
+          minAmountInBaseUnits = BigInt(min) * BigInt(10) ** BigInt(18)
+        }
+      }
+      
       await writeContract({
         address: hackAddr,
         abi: HACKHUB_ABI,
         functionName: 'approveToken',
-        args: [token as `0x${string}`, BigInt(min)]
+        args: [token as `0x${string}`, minAmountInBaseUnits]
       })
       setMinAmounts(prev => ({ ...prev, [token]: '' }))
     } catch (err: any) {
@@ -580,7 +602,7 @@ export default function ManageHackathonPage() {
                     <div className="flex flex-col items-end gap-2 min-w-[280px]">
                       <div className="flex items-center gap-3">
                         <Input
-                          placeholder="Min amount (token units)"
+                          placeholder="Min amount (e.g., 5 for 5 tokens)"
                           value={minAmounts[t.token] || ''}
                           onChange={(e) => setMinAmounts(prev => ({ ...prev, [t.token]: e.target.value }))}
                           className="w-60 bg-white border-gray-300 text-black"
@@ -599,7 +621,7 @@ export default function ManageHackathonPage() {
                           ) : 'Approve Token'}
                         </Button>
                       </div>
-                      <p className="text-xs text-gray-600">For ETH, min amount is in wei. For ERC20, use token's smallest unit.</p>
+                      <p className="text-xs text-gray-600">Enter human-readable amounts (e.g., 5 for 5 tokens). Decimals will be handled automatically.</p>
                     </div>
                   </div>
                 </div>
