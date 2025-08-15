@@ -35,7 +35,9 @@ import {
   RefreshCw,
   Eye,
   History,
-  Settings
+  Settings,
+  Code,
+  FileText
 } from "lucide-react"
 import { useChainId, useAccount, useWriteContract, useWaitForTransactionReceipt, useReadContract } from "wagmi"
 import { toast } from "sonner"
@@ -97,6 +99,10 @@ export default function InteractionClient() {
   const [prizeRecipient, setPrizeRecipient] = useState("")
   const [isEditing, setIsEditing] = useState(false)
   
+  // Modal state for external links
+  const [modalOpen, setModalOpen] = useState(false)
+  const [modalLink, setModalLink] = useState({ url: '', type: '' })
+  
   const searchParams = useSearchParams()
   const hackAddr = searchParams.get('hackAddr')
   const urlChainId = searchParams.get('chainId')
@@ -142,9 +148,11 @@ export default function InteractionClient() {
   // Format token amounts for display - convert from base units to human-readable
   const formatTokenAmount = (amount: bigint, token: string): string => {
     if (token === '0x0000000000000000000000000000000000000000') {
-      // ETH - convert from wei to ether for display
-      const result = Math.floor(Number(formatEther(amount))).toString()
-      return result
+      // ETH - convert from wei to ether for display with up to 4 decimal places
+      const etherValue = Number(formatEther(amount))
+      const result = etherValue.toFixed(4)
+      // Remove trailing zeros and decimal point if not needed
+      return parseFloat(result).toString()
     } else {
       // ERC20 - convert using token decimals for display
       const decimals = tokenDecimals[token] ?? 18
@@ -212,6 +220,7 @@ export default function InteractionClient() {
       let localApprovedTokens: string[] = []
       let localTokenTotals: Record<string, bigint> = {}
       let localTokenSymbols: Record<string, string> = {}
+      let localSponsors: Sponsor[] = []
       try {
         const tokens = await publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'getApprovedTokensList' }) as string[]
         console.log('Approved tokens from contract:', tokens)
@@ -347,8 +356,9 @@ export default function InteractionClient() {
             }
           }
 
-          console.log('Setting sponsors:', sponsorsData.length, sponsorsData)
+          console.log('📊 Setting sponsors:', sponsorsData.length, sponsorsData)
           setSponsors(sponsorsData)
+          localSponsors = sponsorsData
         } catch (e) {
           console.warn('Failed to fetch sponsors', e)
           setSponsors([])
@@ -363,6 +373,7 @@ export default function InteractionClient() {
         localApprovedTokens = []
         localTokenTotals = {}
         localTokenSymbols = {}
+        localSponsors = []
       }
 
       // Fetch judges
@@ -486,9 +497,22 @@ export default function InteractionClient() {
 
       setHackathonData(hackathon)
       setLastSynced(new Date())
+      console.log('📊 Saving hackathon data with judges:', judges.length, judges)
+      console.log('📊 Saving sponsors data:', localSponsors.length, localSponsors)
       try {
-        await hackathonDB.setHackathonDetails(contractAddress, chainId, hackathon)
-      } catch {}
+        // Save extended hackathon details including all interaction data
+        await hackathonDB.setExtendedHackathonDetails(contractAddress, chainId, {
+          hackathonData: hackathon,
+          approvedTokens: localApprovedTokens,
+          tokenMinAmounts: tokenMinAmounts,
+          tokenSymbols: localTokenSymbols,
+          tokenTotals: localTokenTotals,
+          tokenDecimals: tokenDecimals,
+          sponsors: localSponsors
+        })
+      } catch (error) {
+        console.warn('Failed to save extended hackathon details to cache:', error)
+      }
     } catch (err) {
       console.error('Error fetching hackathon data:', err)
       setError('Failed to load hackathon data from blockchain')
@@ -558,6 +582,12 @@ export default function InteractionClient() {
     }
   }
 
+  // Handle opening external links with modal
+  const handleOpenLink = (url: string, type: string) => {
+    setModalLink({ url, type })
+    setModalOpen(true)
+  }
+
   // Handle edit project
   const handleEditProject = () => {
     const userProject = hackathonData?.projects.find(p => 
@@ -584,13 +614,21 @@ export default function InteractionClient() {
       let shouldFetchFromBlockchain = false
       
       try {
-        const cached = await hackathonDB.getHackathonDetails(contractAddress, chainId)
+        const cached = await hackathonDB.getExtendedHackathonDetails(contractAddress, chainId)
         if (cached) {
-          setHackathonData(cached)
+          console.log('📊 Loading hackathon data from cache with judges:', cached.hackathonData.judges?.length, cached.hackathonData.judges)
+          // Restore all state from cache (types are already converted by IndexedDB)
+          setHackathonData(cached.hackathonData)
+          setApprovedTokens(cached.approvedTokens)
+          setTokenMinAmounts(cached.tokenMinAmounts)
+          setTokenSymbols(cached.tokenSymbols)
+          setTokenTotals(cached.tokenTotals)
+          setTokenDecimals(cached.tokenDecimals)
+          console.log('📊 Loading sponsors from cache:', cached.sponsors?.length, cached.sponsors)
+          setSponsors(cached.sponsors)
+          
           // Set last synced from cache timestamp
-          if ((cached as any).timestamp) {
-            setLastSynced(new Date((cached as any).timestamp))
-          }
+          setLastSynced(new Date(cached.timestamp))
           setLoading(false)
           // Successfully loaded from cache, no need to fetch from blockchain
           return
@@ -987,34 +1025,30 @@ export default function InteractionClient() {
               </div>
             </div>
           </div>
+
+          {/* Right side - Sync Button */}
+          <div className="flex flex-col items-end space-y-4">
+            <Button
+              onClick={handleSync}
+              disabled={syncing || loading}
+              className="bg-white/20 backdrop-blur-sm text-black border border-gray-300 hover:bg-white/30 hover:border-white/50 transition-all duration-200 flex items-center gap-2"
+              size="lg"
+            >
+              <RefreshCw className={`w-5 h-5 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync'}
+            </Button>
+            
+            {lastSynced && (
+              <div className="text-gray-800 text-sm text-right">
+                <div>Last synced:</div>
+                <div className="text-xs opacity-90">{lastSynced.toLocaleString()}</div>
+              </div>
+            )}
+          </div>
         </div>
         
         {/* Bottom Decorative Element */}
         <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500"></div>
-      </div>
-
-      {/* Sync Controls */}
-      <div className="flex items-center justify-between bg-white rounded-lg border p-4 shadow-sm">
-        <div className="flex items-center gap-4">
-          <Button
-            onClick={handleSync}
-            disabled={syncing || loading}
-            className="bg-[#8B6914] text-white hover:bg-[#A0471D] flex items-center gap-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'Syncing...' : 'Sync'}
-          </Button>
-          
-          {lastSynced && (
-            <div className="text-sm text-muted-foreground">
-              Last synced: {lastSynced.toLocaleString()}
-            </div>
-          )}
-        </div>
-        
-        <div className="text-sm text-muted-foreground">
-          Data refreshes automatically and is cached locally
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1111,12 +1145,16 @@ export default function InteractionClient() {
                   {approvedTokens.map((t) => (
                     <div key={t} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
                       <div className="text-sm text-gray-800">
-                        <div className="font-semibold">{tokenSymbols[t] || short(t)}</div>
-                        <div className="text-xs text-muted-foreground">{short(t)}</div>
+                        <div className="font-semibold">{t === '0x0000000000000000000000000000000000000000' ? 'Native ETH' : (tokenSymbols[t] || short(t))}</div>
+                        <div className="text-xs text-muted-foreground">{t === '0x0000000000000000000000000000000000000000' ? 'ETH' : short(t)}</div>
                       </div>
                       <div className="text-right text-xs text-gray-700">
                         <div>Total: {formatTokenAmount(tokenTotals[t] ?? BigInt(0), t)}</div>
                         <div>Min deposit: {(() => {
+                          // Hardcode ETH minimum to 1 Wei
+                          if (t === '0x0000000000000000000000000000000000000000') {
+                            return '1 Wei' // 1 Wei = 0.000000000000000001 ETH, but showing practical minimum
+                          }
                           const minAmount = tokenMinAmounts[t]
                           if (minAmount !== undefined && minAmount > BigInt(0)) {
                             return formatTokenAmount(minAmount, t)
@@ -1182,6 +1220,8 @@ export default function InteractionClient() {
               </CardContent>
             </Card>
           )}
+
+
 
           {/* Judges Section */}
           <Card className="border bg-white border-gray-300 shadow-sm">
@@ -1258,9 +1298,9 @@ export default function InteractionClient() {
               <Label className="text-sm">Select Token</Label>
               <select className="w-full border rounded p-2 bg-white text-black" value={depositToken} onChange={e => setDepositToken(e.target.value)}>
                 <option value="">Choose token</option>
-                <option value={'0x0000000000000000000000000000000000000000'}>ETH (native)</option>
-                {approvedTokens.map(t => (
-                  <option key={t} value={t}>{short(t)}</option>
+                <option value={'0x0000000000000000000000000000000000000000'}>Native ETH</option>
+                {approvedTokens.filter(t => t !== '0x0000000000000000000000000000000000000000').map(t => (
+                  <option key={t} value={t}>{tokenSymbols[t] || short(t)}</option>
                 ))}
               </select>
               <Label className="text-sm">Amount</Label>
@@ -1282,12 +1322,14 @@ export default function InteractionClient() {
               <Button onClick={handleDeposit} disabled={Boolean(isDepositing || !depositToken || !depositAmount || (isERC20Selected && needsApproval))} className="w-full bg-[#8B6914] text-white hover:bg-[#A0471D]">
                 {isDepositing ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Depositing...</>) : 'Deposit'}
               </Button>
-              {depositToken && tokenMinAmounts[depositToken] !== undefined && (
+              {depositToken && (
                 <p className="text-xs text-gray-600">
                   Min amount to be listed: {
-                    tokenMinAmounts[depositToken] !== undefined && tokenMinAmounts[depositToken] > BigInt(0) 
-                      ? formatTokenAmount(tokenMinAmounts[depositToken], depositToken)
-                      : 'No minimum required'
+                    depositToken === '0x0000000000000000000000000000000000000000'
+                      ? '0.0001 ETH' // Practical minimum for ETH
+                      : tokenMinAmounts[depositToken] !== undefined && tokenMinAmounts[depositToken] > BigInt(0) 
+                        ? formatTokenAmount(tokenMinAmounts[depositToken], depositToken)
+                        : 'No minimum required'
                   }
                 </p>
               )}
@@ -1352,6 +1394,44 @@ export default function InteractionClient() {
                     >
                       <Eye className="w-4 h-4 mr-2" />
                       Judge Submitted Projects
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* View Projects */}
+          {hackathonData.projects.length > 0 && (
+            <Card className="border shadow-sm border-gray-300 bg-white">
+              <CardContent className="p-6">
+                <div className="text-center space-y-4">
+                  <Target className="w-12 h-12 mx-auto" style={{color: '#8B6914'}} />
+                  <h3 className="font-bold text-lg text-gray-800">View Submitted Projects</h3>
+                  <p className="text-sm text-muted-foreground text-gray-800">
+                    {hackathonData.projects.length} projects submitted to this hackathon
+                  </p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Total Votes Cast:</span>
+                      <span className="font-semibold">{hackathonData.totalTokens}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-600">
+                      <span>Prizes Claimed:</span>
+                      <span className="font-semibold">
+                        {hackathonData.projects.filter(p => p.prizeClaimed).length}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <Link href={`/projects?hackAddr=${hackAddr}&chainId=${urlChainId}`}>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none mt-4 border-gray-300"
+                    >
+                      <Eye className="w-4 h-4 mr-2" />
+                      View All Projects
                     </Button>
                   </Link>
                 </div>
@@ -1491,6 +1571,47 @@ export default function InteractionClient() {
           )}
         </div>
       </div>
+
+      {/* External Link Warning Modal */}
+      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-[#8B6914]">
+              <AlertCircle className="w-5 h-5" />
+              External Link Warning
+            </DialogTitle>
+            <DialogDescription>
+              You are about to visit an external website. Please verify the URL before proceeding.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium text-gray-700">{modalLink.type} URL:</Label>
+              <div className="p-3 bg-gray-50 rounded-lg border">
+                <p className="text-sm font-mono text-gray-800 break-all">{modalLink.url}</p>
+              </div>
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setModalOpen(false)}
+              className="border-gray-300 text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                window.open(modalLink.url, '_blank', 'noopener,noreferrer')
+                setModalOpen(false)
+              }}
+              className="hover:bg-[#8B6914] hover:text-white hover:border-amber-300 bg-[#FAE5C3] text-gray-800 border-none"
+            >
+              Open Link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

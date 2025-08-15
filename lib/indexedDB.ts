@@ -1,5 +1,27 @@
 import { HackathonData } from "@/hooks/useHackathons"
 
+// Extended interface for hackathon details including all interaction data
+interface ExtendedHackathonDetails {
+  // Basic hackathon data
+  hackathonData: HackathonData
+  // Additional interaction data
+  approvedTokens: string[]
+  tokenMinAmounts: Record<string, string> // Store bigint as string for serialization
+  tokenSymbols: Record<string, string>
+  tokenTotals: Record<string, string> // Store bigint as string for serialization
+  tokenDecimals: Record<string, number>
+  sponsors: Array<{
+    address: string
+    name: string
+    image: string
+    contributions: Array<{ token: string; amount: string }> // Store bigint as string
+  }>
+  // Metadata
+  timestamp: number
+  chainId: number
+  contractAddress: string
+}
+
 interface CacheEntry {
   data: any
   timestamp: number
@@ -39,7 +61,7 @@ interface OrganizerHackathonsCache {
 
 class HackathonDB {
   private dbName = 'HackathonDB'
-  private version = 1
+  private version = 2 // Increment version to handle schema changes
   private db: IDBDatabase | null = null
   private cacheExpiration = 5 * 60 * 1000 // 5 minutes
 
@@ -318,6 +340,120 @@ class HackathonDB {
       })
     } catch (error) {
       console.error('Error setting hackathon details cache:', error)
+    }
+  }
+
+  // Extended hackathon details methods (includes all interaction data)
+  async getExtendedHackathonDetails(contractAddress: string, chainId: number): Promise<{
+    hackathonData: HackathonData
+    approvedTokens: string[]
+    tokenMinAmounts: Record<string, bigint>
+    tokenSymbols: Record<string, string>
+    tokenTotals: Record<string, bigint>
+    tokenDecimals: Record<string, number>
+    sponsors: Array<{
+      address: string
+      name: string
+      image: string
+      contributions: Array<{ token: string; amount: bigint }>
+    }>
+    timestamp: number
+    chainId: number
+    contractAddress: string
+  } | null> {
+    try {
+      const { store } = await this.openStore('hackathonDetails', 'readonly')
+      const cacheKey = `extended_${contractAddress}`
+      
+      return new Promise((resolve, reject) => {
+        const request = store.get(cacheKey)
+        request.onsuccess = () => {
+          const result = request.result as ExtendedHackathonDetails | undefined
+          if (result && !this.isExpired(result.timestamp) && result.chainId === chainId) {
+            console.log('📊 IndexedDB: Retrieved extended data with judges:', result.hackathonData?.judges?.length, 'sponsors:', result.sponsors?.length)
+            // Convert string bigints back to bigint
+            const processed = {
+              ...result,
+              tokenMinAmounts: Object.fromEntries(
+                Object.entries(result.tokenMinAmounts).map(([k, v]) => [k, BigInt(v)])
+              ),
+              tokenTotals: Object.fromEntries(
+                Object.entries(result.tokenTotals).map(([k, v]) => [k, BigInt(v)])
+              ),
+              sponsors: result.sponsors.map(sponsor => ({
+                ...sponsor,
+                contributions: sponsor.contributions.map(contrib => ({
+                  ...contrib,
+                  amount: BigInt(contrib.amount)
+                }))
+              }))
+            }
+            resolve(processed as any)
+          } else {
+            resolve(null)
+          }
+        }
+        request.onerror = () => reject(request.error)
+      })
+    } catch (error) {
+      console.error('Error getting extended hackathon details from cache:', error)
+      return null
+    }
+  }
+
+  async setExtendedHackathonDetails(
+    contractAddress: string, 
+    chainId: number, 
+    data: {
+      hackathonData: HackathonData
+      approvedTokens: string[]
+      tokenMinAmounts: Record<string, bigint>
+      tokenSymbols: Record<string, string>
+      tokenTotals: Record<string, bigint>
+      tokenDecimals: Record<string, number>
+      sponsors: Array<{
+        address: string
+        name: string
+        image: string
+        contributions: Array<{ token: string; amount: bigint }>
+      }>
+    }
+  ): Promise<void> {
+    try {
+      const { store } = await this.openStore('hackathonDetails', 'readwrite')
+      const cacheKey = `extended_${contractAddress}`
+
+      // Convert bigints to strings for serialization
+      const entry: ExtendedHackathonDetails = {
+        ...data,
+        tokenMinAmounts: Object.fromEntries(
+          Object.entries(data.tokenMinAmounts).map(([k, v]) => [k, v.toString()])
+        ),
+        tokenTotals: Object.fromEntries(
+          Object.entries(data.tokenTotals).map(([k, v]) => [k, v.toString()])
+        ),
+        sponsors: data.sponsors.map(sponsor => ({
+          ...sponsor,
+          contributions: sponsor.contributions.map(contrib => ({
+            ...contrib,
+            amount: contrib.amount.toString()
+          }))
+        })),
+        timestamp: Date.now(),
+        chainId,
+        contractAddress: cacheKey
+      }
+
+      return new Promise((resolve, reject) => {
+        const request = store.put(entry)
+        request.onsuccess = () => {
+          console.log('📊 IndexedDB: Saved extended data with judges:', data.hackathonData?.judges?.length, 'sponsors:', data.sponsors?.length)
+          resolve()
+        }
+        request.onerror = () => reject(request.error)
+      })
+    } catch (error) {
+      console.error('Error setting extended hackathon details cache:', error)
     }
   }
 

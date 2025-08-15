@@ -341,12 +341,15 @@ export default function ManageHackathonPage() {
   // Token address pretty
   const short = (addr: string) => `${addr.slice(0,6)}...${addr.slice(-4)}`
 
-  // Format token amounts to whole numbers considering decimals
+  // Format token amounts for display - convert from base units to human-readable
   const formatTokenAmount = (amount: string, token: string, decimals?: number): string => {
     const amountBigInt = BigInt(amount)
     if (token === '0x0000000000000000000000000000000000000000') {
-      // ETH - convert from wei to ether and show as whole number
-      return Math.floor(Number(formatEther(amountBigInt))).toString()
+      // ETH - convert from wei to ether for display with up to 4 decimal places
+      const etherValue = Number(formatEther(amountBigInt))
+      const result = etherValue.toFixed(4)
+      // Remove trailing zeros and decimal point if not needed
+      return parseFloat(result).toString()
     } else {
       // ERC20 - convert using token decimals
       const tokenDecimals = decimals ?? 18
@@ -510,67 +513,60 @@ export default function ManageHackathonPage() {
           ) : (
             <div className="space-y-4">
               {judges.map((judge) => (
-                <div key={judge.address} className="border rounded-lg p-4 space-y-3 bg-gray-50">
-                  <div className="flex items-center justify-between">
+                <div key={judge.address} className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-start justify-between gap-6">
+                    {/* Left: judge details */}
                     <div>
                       <p className="font-semibold text-black">{judge.name}</p>
                       <p className="text-sm text-gray-800">{judge.address.slice(0, 10)}...{judge.address.slice(-6)}</p>
+                      <p className="text-xs text-gray-600">Current tokens: {judge.tokensAllocated}</p>
                     </div>
-                    <Badge variant="outline" className="text-black border-gray-400">
-                      {judge.tokensAllocated} tokens
-                    </Badge>
-                  </div>
-                  
-                  {/* Token Adjustment Section */}
-                  {!hackathonInfo?.concluded && (
-                    <div className="pt-3 border-t border-gray-200">
-                      <Label htmlFor={`tokens-${judge.address}`} className="text-sm font-medium text-gray-700 mb-2 block">
-                        Adjust Judge Tokens
-                      </Label>
-                      <div className="flex items-center gap-3">
-                        <Input
-                          id={`tokens-${judge.address}`}
-                          type="number"
-                          min="0"
-                          placeholder="Enter new token amount"
-                          value={tokenAdjustments[judge.address] || ""}
-                          onChange={(e) => setTokenAdjustments(prev => ({
-                            ...prev,
-                            [judge.address]: e.target.value
-                          }))}
-                          className="w-48 bg-white border-gray-300 text-black"
-                        />
-                         <Button
-                          size="sm"
-                          onClick={() => {
-                            const newAmount = parseInt(tokenAdjustments[judge.address] || "0")
-                            if (newAmount >= 0) {
-                              handleAdjustJudgeTokens(judge.address, newAmount)
+
+                    {/* Right: input + update button */}
+                    {!hackathonInfo?.concluded && (
+                      <div className="flex flex-col items-end gap-2 min-w-[280px]">
+                        <div className="flex items-center gap-3">
+                          <Input
+                            id={`tokens-${judge.address}`}
+                            type="number"
+                            min="0"
+                            placeholder="New token amount (e.g., 10)"
+                            value={tokenAdjustments[judge.address] || ""}
+                            onChange={(e) => setTokenAdjustments(prev => ({
+                              ...prev,
+                              [judge.address]: e.target.value
+                            }))}
+                            className="w-60 bg-white border-gray-300 text-black"
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => {
+                              const newAmount = parseInt(tokenAdjustments[judge.address] || "0")
+                              if (newAmount >= 0) {
+                                handleAdjustJudgeTokens(judge.address, newAmount)
+                              }
+                            }}
+                            disabled={
+                              adjustingTokens[judge.address] || 
+                              !tokenAdjustments[judge.address] || 
+                              parseInt(tokenAdjustments[judge.address] || "0") < 0
                             }
-                          }}
-                          disabled={
-                            adjustingTokens[judge.address] || 
-                            !tokenAdjustments[judge.address] || 
-                            parseInt(tokenAdjustments[judge.address] || "0") < 0
-                          }
-                          className="bg-[#8B6914] text-white hover:bg-[#A0471D]"
-                        >
-                          {adjustingTokens[judge.address] ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                              Updating...
-                            </>
-                          ) : (
-                            'Update Tokens'
-                          )}
-                        </Button>
+                            className="bg-[#8B6914] text-white hover:bg-[#A0471D]"
+                          >
+                            {adjustingTokens[judge.address] ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                                Updating...
+                              </>
+                            ) : (
+                              'Update Tokens'
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-600">Set to 0 to remove voting power, increase to allocate more tokens</p>
                       </div>
-                      <p className="text-xs text-gray-600 mt-1">
-                        Current tokens: {judge.tokensAllocated} | 
-                        Set to 0 to remove voting power, increase to allocate more tokens
-                      </p>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -643,12 +639,14 @@ export default function ManageHackathonPage() {
             approvedTokens.map((t) => (
               <div key={t.token} className="flex items-center justify-between border rounded-lg p-4 bg-gray-50">
                 <div>
-                  <p className="font-semibold text-black">{t.symbol || short(t.token)}</p>
+                  <p className="font-semibold text-black">{t.token === '0x0000000000000000000000000000000000000000' ? 'Native ETH' : (t.symbol || short(t.token))}</p>
                   <p className="text-xs text-gray-600">
                     Min: {
-                      BigInt(t.minAmount) > BigInt(0) 
-                        ? formatTokenAmount(t.minAmount, t.token, t.decimals)
-                        : 'No minimum'
+                      t.token === '0x0000000000000000000000000000000000000000'
+                        ? '1 Wei' // Hardcode ETH minimum to 1 Wei
+                        : BigInt(t.minAmount) > BigInt(0) 
+                          ? formatTokenAmount(t.minAmount, t.token, t.decimals)
+                          : 'No minimum'
                     }
                   </p>
                 </div>
