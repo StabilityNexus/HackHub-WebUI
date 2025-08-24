@@ -8,8 +8,8 @@ const nextConfig = {
         output: 'export',
         distDir: 'out',
         basePath: '',
-        assetPrefix: '/HackHub-WebUI/',
-        images: { unoptimized: true },
+        assetPrefix: '',
+        images: { unoptimized: false },
       }
     : {
         // Keep dev output in .next to avoid self-triggering file watchers
