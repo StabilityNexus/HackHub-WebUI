@@ -7,19 +7,9 @@ const nextConfig = {
     ? {
         output: 'export',
         distDir: 'out',
-        images: { 
-          unoptimized: true,
-          remotePatterns: [
-            {
-              protocol: 'https',
-              hostname: '**',
-            },
-            {
-              protocol: 'http',
-              hostname: '**',
-            },
-          ],
-        },
+        basePath: '',
+        assetPrefix: '/HackHub-WebUI/',
+        images: { unoptimized: true },
       }
     : {
         // Keep dev output in .next to avoid self-triggering file watchers
