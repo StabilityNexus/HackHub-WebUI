@@ -7,9 +7,19 @@ const nextConfig = {
     ? {
         output: 'export',
         distDir: 'out',
-        basePath: '',
-        assetPrefix: '',
-        images: { unoptimized: true },
+        images: { 
+          unoptimized: true,
+          remotePatterns: [
+            {
+              protocol: 'https',
+              hostname: '**',
+            },
+            {
+              protocol: 'http',
+              hostname: '**',
+            },
+          ],
+        },
       }
     : {
         // Keep dev output in .next to avoid self-triggering file watchers
