@@ -1,3 +1,4 @@
+
 const isProd = process.env.NODE_ENV === 'production';
 
 /** @type {import('next').NextConfig} */
@@ -6,40 +7,16 @@ const nextConfig = {
     ? {
         output: 'export',
         distDir: 'out',
-        basePath: '/HackHub-WebUI',
-        assetPrefix: '/HackHub-WebUI/',
-        images: { 
-          unoptimized: true,
-          remotePatterns: [
-            {
-              protocol: 'https',
-              hostname: '**',
-            },
-            {
-              protocol: 'http',
-              hostname: '**',
-            },
-          ],
-        },
+        basePath: '',
+        assetPrefix: '',
+        images: { unoptimized: true },
       }
     : {
         // Keep dev output in .next to avoid self-triggering file watchers
         distDir: '.next',
         basePath: '',
         assetPrefix: '',
-        images: { 
-          unoptimized: false,
-          remotePatterns: [
-            {
-              protocol: 'https',
-              hostname: '**',
-            },
-            {
-              protocol: 'http',
-              hostname: '**',
-            },
-          ],
-        },
+        images: { unoptimized: false },
         // When using the webpack dev server, ignore generated dirs to prevent rebuild loops
         webpackDevMiddleware(config) {
           config.watchOptions = {
