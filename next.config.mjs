@@ -6,8 +6,8 @@ const nextConfig = {
     ? {
         output: 'export',
         distDir: 'out',
-        basePath: '/HackHub',
-        assetPrefix: '/HackHub/',
+        basePath: '/hackhub.stability.nexus/',
+        assetPrefix: '/hackhub.stability.nexus/',
         images: { unoptimized: true },
       }
     : {
