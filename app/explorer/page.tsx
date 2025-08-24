@@ -21,7 +21,7 @@ import { useChainId, useAccount } from "wagmi"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 import { formatUTCTimestamp } from '@/utils/timeUtils'
-import Image from "next/image"
+// Removed Next.js Image import for static export compatibility
 import { hackathonDB } from "@/lib/indexedDB"
 import { useRouter, useSearchParams } from "next/navigation"
 
@@ -579,13 +579,10 @@ function ExplorerPageContent() {
                           {/* Top section - Image */}
                           <div className="flex justify-center mb-4">
                             <div className="h-20 w-20 relative group-hover:scale-105 transition-transform duration-300">
-                              <Image
+                              <img
                                 src={hackathon.image || getImagePath("/block.png")}
                                 alt="Hackathon Image"
-                                width={80}
-                                height={80}
                                 className="h-full w-full object-contain rounded-lg"
-                                priority
                                 onError={(e) => {
                                   // Fallback to block.png if custom image fails to load
                                   const target = e.target as HTMLImageElement;
@@ -676,13 +673,10 @@ function ExplorerPageContent() {
                           {/* Top section - Image */}
                           <div className="flex justify-center mb-4">
                             <div className="h-20 w-20 relative group-hover:scale-105 transition-transform duration-300">
-                              <Image
+                              <img
                                 src={hackathon.image || getImagePath("/block.png")}
                                 alt="Hackathon Image"
-                                width={80}
-                                height={80}
                                 className="h-full w-full object-contain rounded-lg grayscale group-hover:grayscale-0 transition-all duration-300"
-                                priority
                                 onError={(e) => {
                                   // Fallback to block.png if custom image fails to load
                                   const target = e.target as HTMLImageElement;
