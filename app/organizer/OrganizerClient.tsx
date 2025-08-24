@@ -8,8 +8,7 @@ import { Card, CardContent } from "@/components/ui/card"
 
 // Helper function to get the correct image path for GitHub Pages
 const getImagePath = (path: string) => {
-  const basePath = process.env.NODE_ENV === 'production' ? '/HackHub-WebUI' : '';
-  return `${basePath}${path}`;
+  return path;
 };
 import { HackathonData, getHackathonStatus, getDaysRemaining } from "@/hooks/useHackathons"
 import { getPublicClient } from "@wagmi/core"

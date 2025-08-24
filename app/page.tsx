@@ -26,8 +26,7 @@ import {
 
 // Helper function to get the correct image path for GitHub Pages
 const getImagePath = (path: string) => {
-  const basePath = process.env.NODE_ENV === 'production' ? '/HackHub-WebUI' : '';
-  return `${basePath}${path}`;
+  return path;
 };
 
 export default function HomePage() {

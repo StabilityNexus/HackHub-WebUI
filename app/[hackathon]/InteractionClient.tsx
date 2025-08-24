@@ -14,8 +14,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 
 // Helper function to get the correct image path for GitHub Pages
 const getImagePath = (path: string) => {
-  const basePath = process.env.NODE_ENV === 'production' ? '/HackHub-WebUI' : '';
-  return `${basePath}${path}`;
+  // Let Next.js handle the basePath automatically through the configuration
+  return path;
 };
 
 import { HackathonData, getHackathonStatus, getDaysRemaining, Judge, Project } from "@/hooks/useHackathons"
