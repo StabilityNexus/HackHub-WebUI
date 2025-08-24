@@ -7,16 +7,39 @@ const nextConfig = {
         output: 'export',
         distDir: 'out',
         basePath: '/HackHub-WebUI',
-        assetPrefix: '/HackHub-WebUI',
-        trailingSlash: false,
-        images: { unoptimized: true },
+        assetPrefix: '/HackHub-WebUI/',
+        images: { 
+          unoptimized: true,
+          remotePatterns: [
+            {
+              protocol: 'https',
+              hostname: '**',
+            },
+            {
+              protocol: 'http',
+              hostname: '**',
+            },
+          ],
+        },
       }
     : {
         // Keep dev output in .next to avoid self-triggering file watchers
         distDir: '.next',
         basePath: '',
         assetPrefix: '',
-        images: { unoptimized: false },
+        images: { 
+          unoptimized: false,
+          remotePatterns: [
+            {
+              protocol: 'https',
+              hostname: '**',
+            },
+            {
+              protocol: 'http',
+              hostname: '**',
+            },
+          ],
+        },
         // When using the webpack dev server, ignore generated dirs to prevent rebuild loops
         webpackDevMiddleware(config) {
           config.watchOptions = {
@@ -29,6 +52,3 @@ const nextConfig = {
 };
 
 export default nextConfig;
-
-
-
