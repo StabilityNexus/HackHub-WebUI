@@ -7,7 +7,8 @@ const nextConfig = {
         output: 'export',
         distDir: 'out',
         basePath: '/hackhub.stability.nexus',
-        assetPrefix: '/hackhub.stability.nexus/',
+        assetPrefix: '/hackhub.stability.nexus',
+        trailingSlash: false,
         images: { unoptimized: true },
       }
     : {
@@ -28,3 +29,6 @@ const nextConfig = {
 };
 
 export default nextConfig;
+
+
+
