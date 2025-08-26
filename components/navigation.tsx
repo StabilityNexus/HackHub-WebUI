@@ -45,7 +45,7 @@ export default function Navigation() {
                     : "text-gray-700 hover:text-amber-800 hover:bg-amber-50/80"
                 } transition-all duration-200 font-medium`}
               >
-                Organize a Hackathon"
+                Organize a Hackathon
               </Button>
             </Link>
             <Link href="/myHackathons">
