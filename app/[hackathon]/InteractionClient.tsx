@@ -1108,8 +1108,8 @@ export default function InteractionClient() {
                   {/* Organizer Address */}
                   <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200">
                     <div className="flex items-center gap-2 mb-2">
-                      <Users className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm font-semibold text-blue-800">Organizer</span>
+                      <Users className="w-4 h-4 text-amber-600" />
+                      <span className="text-sm font-semibold text-amber-800">Organizer</span>
                     </div>
                     <p className="text-xs font-mono text-gray-700 break-all bg-white/60 p-2 rounded border">
                       {hackathonData.organizer}
