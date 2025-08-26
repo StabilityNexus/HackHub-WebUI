@@ -268,7 +268,6 @@ export default function HomePage() {
               {/* Revolution Text - Moved Higher */}
               <div className="relative -mt-8">
                 {/* Small decorative elements */}
-                <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-amber-300 to-orange-300 rounded-full opacity-50"></div>
                 
                 <div className="relative z-10 mt-">
                   <div className="flex items-center justify-between">
