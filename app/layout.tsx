@@ -6,7 +6,7 @@ import { WalletProvider } from '@/providers/WalletProvider'
 import Navigation from '@/components/navigation'
 
 export const metadata: Metadata = {
-  title: 'HackHub - Web3 Hackathon Platform',
+  title: 'HackHub - Decentralized Hackathon Platform',
   description: 'A modern platform for Web3 hackathons with project submission and judging capabilities',
   generator: 'Next.js',
 }
