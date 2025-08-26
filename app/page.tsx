@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import DecryptedText from "@/components/DecryptedText"
 
 import { HackathonData, getHackathonStatus } from "@/hooks/useHackathons"
 import { getPublicClient } from "@wagmi/core"
@@ -220,10 +221,28 @@ export default function HomePage() {
                 <div className="relative z-10 -mt-24 pb-8">
                   <h1 className="text-6xl lg:text-7xl font-black leading-tight">
                     <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 drop-shadow-sm">
-                    Welcome to the On-Chain
+                      <DecryptedText 
+                        text="Welcome to the On-Chain"
+                        animateOn="view"
+                        speed={75}
+                        maxIterations={15}
+                        sequential={true}
+                        revealDirection="start"
+                        className=""
+                        encryptedClassName="text-amber-400/40"
+                      />
                     </span>
                     <span className="block text-6xl lg:text-8xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-orange-600 to-amber-800 mt-4 tracking-tight">
-                      Hackathon Hub.
+                      <DecryptedText 
+                        text="Hackathon Hub."
+                        animateOn="view"
+                        speed={100}
+                        maxIterations={20}
+                        sequential={true}
+                        revealDirection="center"
+                        className=""
+                        encryptedClassName="text-orange-400/30"
+                      />
                     </span>
                   </h1>
                   
@@ -232,7 +251,16 @@ export default function HomePage() {
                    
                    <div className="mt-8">
                      <p className="text-xl lg:text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-600 tracking-wider">
-                     Transparent. Permissionless. Intuitive.
+                       <DecryptedText 
+                         text="Transparent. Permissionless. Intuitive."
+                         animateOn="view"
+                         speed={60}
+                         maxIterations={12}
+                         sequential={true}
+                         revealDirection="start"
+                         className=""
+                         encryptedClassName="text-amber-500/30"
+                       />
                      </p>
                    </div>
                 </div>
