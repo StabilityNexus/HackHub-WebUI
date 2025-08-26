@@ -1059,37 +1059,65 @@ export default function InteractionClient() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-black">About This Hackathon</CardTitle>
-                {isUserOrganizer && (
-                  <Link href={`/manage?hackAddr=${hackAddr}&chainId=${urlChainId}`}>
+                <div className="flex items-center gap-2">
+                  <Link href={`/organizer?address=${hackathonData.organizer}`}>
                     <Button 
                       variant="outline" 
                       size="sm" 
                       className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
                     >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Manage
+                      <History className="w-4 h-4 mr-2" />
+                      Organizer's Events
                     </Button>
                   </Link>
-                )}
+                  {isUserOrganizer && (
+                    <Link href={`/manage?hackAddr=${hackAddr}&chainId=${urlChainId}`}>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
+                      >
+                        <Settings className="w-4 h-4 mr-2" />
+                        Manage
+                      </Button>
+                    </Link>
+                  )}
+                </div>
               </div>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground text-black leading-relaxed mb-4">
+              <p className="text-muted-foreground text-black leading-relaxed mb-6">
                 Join this Web3 hackathon and compete for a share of a multi-token prize pool funded by sponsors and the organizer. 
                 Submit your project during the submission period and get votes from judges to win prizes.
               </p>
-              <div className="grid grid-cols-2 gap-4 mt-6">
-                <div className="text-center p-4 bg-gray-50 rounded-lg border">
-                  <Vote className="w-8 h-8 mx-auto mb-2" style={{color: '#8B6914'}} />
-                  <p className="text-2xl font-bold" style={{color: '#8B6914'}}>{hackathonData.totalTokens}</p>
-                  <p className="text-md font-bold text-gray-800 text-muted-foreground">Total Voting Tokens</p>
-                </div>
-                <div className="text-center p-4 bg-gray-50 rounded-lg border" >
-                  <Users className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
-                  <p className="text-2xl font-bold" style={{color: '#8B6914'}}>{hackathonData.judgeCount}</p>
-                  <p className="text-md font-bold text-gray-800 text-muted-foreground">Judges</p>
+              
+              {/* Hackathon Technical Details */}
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Contract Address */}
+                  <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Code className="w-4 h-4 text-amber-600" />
+                      <span className="text-sm font-semibold text-amber-800">Smart Contract</span>
+                    </div>
+                    <p className="text-xs font-mono text-gray-700 break-all bg-white/60 p-2 rounded border">
+                      {hackathonData.contractAddress}
+                    </p>
+                  </div>
+                  
+                  {/* Organizer Address */}
+                  <div className="p-4 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="w-4 h-4 text-amber-600" />
+                      <span className="text-sm font-semibold text-amber-800">Organizer</span>
+                    </div>
+                    <p className="text-xs font-mono text-gray-700 break-all bg-white/60 p-2 rounded border">
+                      {hackathonData.organizer}
+                    </p>
+                  </div>
                 </div>
               </div>
+
             </CardContent>
           </Card>
 
@@ -1138,7 +1166,7 @@ export default function InteractionClient() {
           {approvedTokens.length > 0 && (
             <Card className="border bg-white border-gray-300 shadow-sm">
               <CardHeader>
-                <CardTitle className="text-black">Approved Tokens</CardTitle>
+                <CardTitle className="text-black">Prize Pool</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -1169,6 +1197,67 @@ export default function InteractionClient() {
             </Card>
           )}
 
+
+
+
+
+          {/* Judges Section */}
+          <Card className="border bg-white border-gray-300 shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center text-black gap-2">
+                <Gavel className="w-5 h-5" style={{color: '#8B6914'}} />
+                Judges & Voting Tokens
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {/* Stats at the top */}
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="text-center p-4 bg-gray-50 rounded-lg border">
+                  <Vote className="w-8 h-8 mx-auto mb-2" style={{color: '#8B6914'}} />
+                  <p className="text-2xl font-bold" style={{color: '#8B6914'}}>{hackathonData.totalTokens}</p>
+                  <p className="text-md font-bold text-gray-800 text-muted-foreground">Total Voting Tokens</p>
+                </div>
+                <div className="text-center p-4 bg-gray-50 rounded-lg border" >
+                  <Users className="w-8 h-8 text-yellow-600 mx-auto mb-2" />
+                  <p className="text-2xl font-bold" style={{color: '#8B6914'}}>{hackathonData.judgeCount}</p>
+                  <p className="text-md font-bold text-gray-800 text-muted-foreground">Judges</p>
+                </div>
+              </div>
+              <div className="space-y-4">
+                {hackathonData.judges.map((judge, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback className="bg-amber-100 text-amber-700">
+                          {judge.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold text-gray-800">{judge.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {judge.address.slice(0, 6)}...{judge.address.slice(-4)}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <Vote className="w-4 h-4 text-amber-600" />
+                          <span className="text-sm font-semibold text-gray-800">
+                            {judge.tokensRemaining} remaining out of {judge.tokensAllocated}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-6">
           {/* Sponsors */}
           {sponsors.length > 0 && (
             <Card className="border bg-white border-gray-300 shadow-sm">
@@ -1176,7 +1265,7 @@ export default function InteractionClient() {
                 <CardTitle className="text-black">Sponsors</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-4">
                   {sponsors.map((s) => (
                     <div key={s.address} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
                       <div className="flex items-center gap-3">
@@ -1203,7 +1292,7 @@ export default function InteractionClient() {
                           )}
                         </div>
                         <div>
-                          <p className="font-semibold text-gray-800">{s.name || short(s.address)}</p>
+                          <p className="font-semibold text-gray-800 text-sm">{s.name || short(s.address)}</p>
                           <p className="text-xs text-muted-foreground">{short(s.address)}</p>
                         </div>
                       </div>
@@ -1221,57 +1310,6 @@ export default function InteractionClient() {
             </Card>
           )}
 
-
-
-          {/* Judges Section */}
-          <Card className="border bg-white border-gray-300 shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center text-black gap-2">
-                <Gavel className="w-5 h-5" style={{color: '#8B6914'}} />
-                Judges & Voting Tokens
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {hackathonData.judges.map((judge, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="w-10 h-10">
-                        <AvatarFallback className="bg-amber-100 text-amber-700">
-                          {judge.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-semibold text-gray-800">{judge.name}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {judge.address.slice(0, 6)}...{judge.address.slice(-4)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-800">
-                            {judge.tokensAllocated} total
-                          </span>
-                          <Vote className="w-4 h-4 text-amber-600" />
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">
-                            {judge.tokensRemaining} remaining
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Sidebar */}
-        <div className="space-y-6">
           {/* Submit Token for Approval */}
           <Card className="border bg-white border-gray-300 shadow-sm">
             <CardHeader>
@@ -1335,44 +1373,7 @@ export default function InteractionClient() {
               )}
             </CardContent>
           </Card>
-          {/* Quick Stats - Enhanced */}
-          <Card className="border bg-white border-gray-300 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-black">Quick Stats</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-gray-800">Status</span>
-                {getStatusBadge()}
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-gray-800">Contract</span>
-                <span className="text-sm font-mono text-gray-800">
-                  {hackathonData.contractAddress.slice(0, 6)}...{hackathonData.contractAddress.slice(-4)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground text-gray-800">Organizer</span>
-                <span className="text-sm font-mono text-gray-800">
-                  {hackathonData.organizer.slice(0, 6)}...{hackathonData.organizer.slice(-4)}
-                </span>
-              </div>
-              
-              {/* Organizer Past Events Button */}
-              <div className="pt-2">
-                <Link href={`/organizer?address=${hackathonData.organizer}`}>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
-                  >
-                    <History className="w-4 h-4 mr-2" />
-                    View Organizer's Events
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
+
 
           {/* Judge Voting Interface */}
           {isUserJudge && (
