@@ -33,10 +33,10 @@ export default function Navigation() {
                     : "text-gray-700 hover:text-amber-800 hover:bg-amber-50/80"
                 } transition-all duration-200 font-medium`}
               >
-                Explorer
+                Explorer Hackathons
               </Button>
             </Link>
-            <Link href="/myHackathons">
+            <Link href="/createHackathon">
               <Button 
                 variant="ghost"
                 className={`${
@@ -45,10 +45,10 @@ export default function Navigation() {
                     : "text-gray-700 hover:text-amber-800 hover:bg-amber-50/80"
                 } transition-all duration-200 font-medium`}
               >
-                My Hackathons
+                Organize a Hackathon
               </Button>
             </Link>
-            <Link href="/createHackathon">
+            <Link href="/myHackathons">
               <Button 
                 variant="ghost"
                 className={`${
@@ -57,7 +57,7 @@ export default function Navigation() {
                     : "text-gray-700 hover:text-amber-800 hover:bg-amber-50/80"
                 } transition-all duration-200 font-medium`}
               >
-                Create
+                My Hackathons
               </Button>
             </Link>
           </nav>
