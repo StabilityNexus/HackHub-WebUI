@@ -30,6 +30,10 @@ const ERC20_ABI = [
     "type": "function"
   }
 ] as const
+
+// Helper function to shorten addresses
+const short = (addr: string) => `${addr.slice(0, 6)}...${addr.slice(-4)}`
+
 import { 
   Users, 
   Gavel, 
@@ -37,7 +41,10 @@ import {
   Loader2, 
   AlertCircle,
   ArrowLeft,
-  CheckCircle
+  CheckCircle,
+  Eye,
+  EyeOff,
+  RefreshCw
 } from "lucide-react"
 import { useChainId, useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi"
 import { toast } from "sonner"
@@ -60,15 +67,16 @@ interface HackathonInfo {
   endTime: number
 }
 
-interface SubmittedTokenInfo {
-  token: string
+interface SponsorInfo {
+  address: string
   name: string
-  submitter: string
+  image: string
+  isBlocked: boolean
+  totalContributions: { token: string; amount: bigint; symbol?: string }[]
 }
 
-interface ApprovedTokenInfo {
+interface DepositedTokenInfo {
   token: string
-  minAmount: string
   totalAmount: string
   symbol?: string
   decimals?: number
@@ -93,10 +101,124 @@ export default function ManageHackathonPage() {
   const [needsWallet, setNeedsWallet] = useState(false)
   const [adjustingTokens, setAdjustingTokens] = useState<{[key: string]: boolean}>({})
   const [tokenAdjustments, setTokenAdjustments] = useState<{[key: string]: string}>({})
-  const [submittedTokens, setSubmittedTokens] = useState<SubmittedTokenInfo[]>([])
-  const [approvedTokens, setApprovedTokens] = useState<ApprovedTokenInfo[]>([])
-  const [minAmounts, setMinAmounts] = useState<{[token: string]: string}>({})
-  const [approvingToken, setApprovingToken] = useState<{[token: string]: boolean}>({})
+  const [sponsors, setSponsors] = useState<SponsorInfo[]>([])
+  const [depositedTokens, setDepositedTokens] = useState<DepositedTokenInfo[]>([])
+  const [blockingSponsor, setBlockingSponsor] = useState<{[address: string]: boolean}>({})
+  const [refreshingSponsors, setRefreshingSponsors] = useState(false)
+
+  // Load sponsors and their contributions
+  const loadSponsorsData = async () => {
+    if (!hackAddr) return
+    try {
+      setRefreshingSponsors(true)
+      const publicClient = getPublicClient(config)
+      
+      // Get all sponsors
+      const sponsorAddresses = await publicClient.readContract({
+        address: hackAddr,
+        abi: HACKHUB_ABI,
+        functionName: 'getAllSponsors'
+      }) as string[]
+      
+      // Get deposited tokens to check contributions
+      const depositedTokensList = await publicClient.readContract({
+        address: hackAddr,
+        abi: HACKHUB_ABI,
+        functionName: 'getDepositedTokensList'
+      }) as string[]
+      
+      const sponsorsInfo: SponsorInfo[] = []
+      
+      for (const sponsorAddr of sponsorAddresses) {
+        try {
+          // Get sponsor profile
+          const [name, image] = await publicClient.readContract({
+            address: hackAddr,
+            abi: HACKHUB_ABI,
+            functionName: 'getSponsorProfile',
+            args: [sponsorAddr as `0x${string}`]
+          }) as [string, string]
+          
+          // Check if sponsor is blocked
+          const isBlocked = await publicClient.readContract({
+            address: hackAddr,
+            abi: HACKHUB_ABI,
+            functionName: 'isSponsorBlocked',
+            args: [sponsorAddr as `0x${string}`]
+          }) as boolean
+          
+          // Get contributions for each token
+          const contributions: { token: string; amount: bigint; symbol?: string }[] = []
+          for (const token of depositedTokensList) {
+            const amount = await publicClient.readContract({
+              address: hackAddr,
+              abi: HACKHUB_ABI,
+              functionName: 'getSponsorTokenAmount',
+              args: [sponsorAddr as `0x${string}`, token as `0x${string}`]
+            }) as bigint
+            
+            if (amount > 0n) {
+              let symbol = 'Unknown'
+              try {
+                if (token === '0x0000000000000000000000000000000000000000') {
+                  symbol = 'ETH'
+                } else {
+                  symbol = await publicClient.readContract({ 
+                    address: token as `0x${string}`, 
+                    abi: ERC20_ABI, 
+                    functionName: 'symbol' 
+                  }) as string
+                }
+              } catch {}
+              contributions.push({ token, amount, symbol })
+            }
+          }
+          
+          if (contributions.length > 0) {
+            sponsorsInfo.push({
+              address: sponsorAddr,
+              name: name || 'Anonymous',
+              image: image || '',
+              isBlocked,
+              totalContributions: contributions
+            })
+          }
+        } catch (error) {
+          console.error(`Error loading sponsor ${sponsorAddr}:`, error)
+        }
+      }
+      
+      setSponsors(sponsorsInfo)
+    } catch (error) {
+      console.error('Error loading sponsors:', error)
+    } finally {
+      setRefreshingSponsors(false)
+    }
+  }
+  
+  // Handle sponsor blocking/unblocking
+  const handleBlockSponsor = async (sponsorAddress: string, block: boolean) => {
+    if (!hackAddr || !userAddress) return
+    try {
+      setBlockingSponsor(prev => ({ ...prev, [sponsorAddress]: true }))
+      
+      await writeContract({
+        address: hackAddr,
+        abi: HACKHUB_ABI,
+        functionName: block ? 'blockSponsor' : 'unblockSponsor',
+        args: [sponsorAddress as `0x${string}`]
+      })
+      
+      toast.success(`Sponsor ${block ? 'blocked' : 'unblocked'} successfully`)
+      // Refresh sponsors data
+      setTimeout(() => loadSponsorsData(), 1500)
+    } catch (error: any) {
+      console.error('Error blocking/unblocking sponsor:', error)
+      toast.error(error?.message || `Failed to ${block ? 'block' : 'unblock'} sponsor`)
+    } finally {
+      setBlockingSponsor(prev => ({ ...prev, [sponsorAddress]: false }))
+    }
+  }
 
   // Handle judge token adjustment
   const handleAdjustJudgeTokens = async (judgeAddress: string, newAmount: number) => {
@@ -125,51 +247,7 @@ export default function ManageHackathonPage() {
     }
   }
 
-  const handleApproveSubmittedToken = async (token: string) => {
-    if (!hackAddr) return
-    const min = minAmounts[token]
-    if (!min || isNaN(Number(min))) {
-      setError('Please enter a valid minimum amount for this token')
-      return
-    }
-    try {
-      setApprovingToken(prev => ({ ...prev, [token]: true }))
-      
-      // Convert human-readable amount to base units (wei for ETH, smallest units for ERC20)
-      let minAmountInBaseUnits: bigint
-      if (token === '0x0000000000000000000000000000000000000000') {
-        // ETH - convert to wei (18 decimals)
-        minAmountInBaseUnits = BigInt(min) * BigInt(10) ** BigInt(18)
-      } else {
-        // ERC20 - get decimals and convert to base units
-        try {
-          const publicClient = getPublicClient(config)
-          const decimals = await publicClient.readContract({ 
-            address: token as `0x${string}`, 
-            abi: ERC20_ABI, 
-            functionName: 'decimals' 
-          }) as number
-          minAmountInBaseUnits = BigInt(min) * BigInt(10) ** BigInt(decimals)
-        } catch {
-          // Default to 18 decimals if we can't get token decimals
-          minAmountInBaseUnits = BigInt(min) * BigInt(10) ** BigInt(18)
-        }
-      }
-      
-      await writeContract({
-        address: hackAddr,
-        abi: HACKHUB_ABI,
-        functionName: 'approveToken',
-        args: [token as `0x${string}`, minAmountInBaseUnits]
-      })
-      setMinAmounts(prev => ({ ...prev, [token]: '' }))
-    } catch (err: any) {
-      console.error('Error approving token:', err)
-      setError('Failed to approve token: ' + (err?.message || 'Unknown error'))
-    } finally {
-      setApprovingToken(prev => ({ ...prev, [token]: false }))
-    }
-  }
+
 
   // Load hackathon data
   const loadHackathonData = async () => {
@@ -262,43 +340,25 @@ export default function ManageHackathonPage() {
 
       setJudges(judgeList)
 
-      // Load submitted tokens
-      try {
-        const submitted = await publicClient.readContract({
-          address: hackAddr,
-          abi: HACKHUB_ABI,
-          functionName: 'getSubmittedTokensList'
-        }) as string[]
-        const submittedInfos: SubmittedTokenInfo[] = []
-        for (const t of submitted) {
-          const [tokenName, submitter, exists] = await publicClient.readContract({
-            address: hackAddr,
-            abi: HACKHUB_ABI,
-            functionName: 'getTokenSubmission',
-            args: [t as `0x${string}`]
-          }) as [string, string, boolean]
-          if (exists) submittedInfos.push({ token: t, name: tokenName, submitter })
-        }
-        setSubmittedTokens(submittedInfos)
-      } catch (e) {
-        console.error('Error loading submitted tokens', e)
-      }
+      // Load sponsors and their contributions
+      await loadSponsorsData()
 
-      // Load approved tokens
+      // Load deposited tokens
       try {
-        const approved = await publicClient.readContract({
+        const deposited = await publicClient.readContract({
           address: hackAddr,
           abi: HACKHUB_ABI,
-          functionName: 'getApprovedTokensList'
+          functionName: 'getDepositedTokensList'
         }) as string[]
-        const approvedInfos: ApprovedTokenInfo[] = []
-        for (const t of approved) {
-          const [min, total] = await Promise.all([
-            publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'getTokenMinAmount', args: [t as `0x${string}`] }) as Promise<bigint>,
-            publicClient.readContract({ address: hackAddr, abi: HACKHUB_ABI, functionName: 'getTokenTotal', args: [t as `0x${string}`] }) as Promise<bigint>,
-          ])
+        const depositedInfos: DepositedTokenInfo[] = []
+        for (const t of deposited) {
+          const total = await publicClient.readContract({ 
+            address: hackAddr, 
+            abi: HACKHUB_ABI, 
+            functionName: 'getTokenTotal', 
+            args: [t as `0x${string}`] 
+          }) as bigint
           
-          // Get token symbol and decimals
           let symbol = 'Unknown'
           let decimals = 18
           try {
@@ -306,28 +366,22 @@ export default function ManageHackathonPage() {
               symbol = 'ETH'
               decimals = 18
             } else {
-              const [sym, dec] = await Promise.all([
-                publicClient.readContract({ address: t as `0x${string}`, abi: ERC20_ABI, functionName: 'symbol' }) as Promise<string>,
-                publicClient.readContract({ address: t as `0x${string}`, abi: ERC20_ABI, functionName: 'decimals' }) as Promise<number>
-              ])
-              symbol = sym
-              decimals = dec
+              symbol = await publicClient.readContract({ address: t as `0x${string}`, abi: ERC20_ABI, functionName: 'symbol' }) as string
+              decimals = await publicClient.readContract({ address: t as `0x${string}`, abi: ERC20_ABI, functionName: 'decimals' }) as number
             }
           } catch {
             symbol = short(t)
           }
-          
-          approvedInfos.push({ 
-            token: t, 
-            minAmount: String(min), 
-            totalAmount: String(total),
+          depositedInfos.push({
+            token: t,
+            totalAmount: formatEther(total),
             symbol,
             decimals
           })
         }
-        setApprovedTokens(approvedInfos)
+        setDepositedTokens(depositedInfos)
       } catch (e) {
-        console.error('Error loading approved tokens', e)
+        console.error('Error loading deposited tokens', e)
       }
 
     } catch (err) {
@@ -338,8 +392,7 @@ export default function ManageHackathonPage() {
     }
   }
 
-  // Token address pretty
-  const short = (addr: string) => `${addr.slice(0,6)}...${addr.slice(-4)}`
+
 
   // Format token amounts for display - convert from base units to human-readable
   const formatTokenAmount = (amount: string, token: string, decimals?: number): string => {
@@ -574,84 +627,123 @@ export default function ManageHackathonPage() {
         </CardContent>
       </Card>
 
-      {/* Submitted Tokens for Approval */}
-      {!hackathonInfo.concluded && (
-        <Card className="bg-white">
-          <CardHeader>
-            <CardTitle className="text-black">Submitted Tokens</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {submittedTokens.length === 0 ? (
-              <p className="text-gray-800">No token submissions yet.</p>
-            ) : (
-              submittedTokens.map((t) => (
-                <div key={t.token} className="border rounded-lg p-4 bg-gray-50">
-                  <div className="flex items-start justify-between gap-6">
-                    {/* Left: token details */}
-                    <div>
-                      <p className="font-semibold text-black">{t.name || 'Token'}</p>
-                      <p className="text-sm text-gray-800">{short(t.token)}</p>
-                      <p className="text-xs text-gray-600">Submitted by {short(t.submitter)}</p>
-                    </div>
-
-                    {/* Right: input + approve button */}
-                    <div className="flex flex-col items-end gap-2 min-w-[280px]">
-                      <div className="flex items-center gap-3">
-                        <Input
-                          placeholder="Min amount (e.g., 5 for 5 tokens)"
-                          value={minAmounts[t.token] || ''}
-                          onChange={(e) => setMinAmounts(prev => ({ ...prev, [t.token]: e.target.value }))}
-                          className="w-60 bg-white border-gray-300 text-black"
-                        />
-                        <Button
-                          size="sm"
-                          onClick={() => handleApproveSubmittedToken(t.token)}
-                          disabled={approvingToken[t.token] || !minAmounts[t.token]}
-                          className="bg-[#8B6914] text-white hover:bg-[#A0471D]"
-                        >
-                          {approvingToken[t.token] ? (
-                            <>
-                              <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                              Approving...
-                            </>
-                          ) : 'Approve Token'}
-                        </Button>
-                      </div>
-                      <p className="text-xs text-gray-600">Enter human-readable amounts (e.g., 5 for 5 tokens). Decimals will be handled automatically.</p>
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Approved Tokens Overview */}
+      {/* Sponsor Management */}
       <Card className="bg-white">
         <CardHeader>
-          <CardTitle className="text-black">Approved Tokens</CardTitle>
+          <CardTitle className="flex items-center justify-between text-black">
+            <span>Sponsor Management</span>
+            <Button
+              size="sm"
+              onClick={loadSponsorsData}
+              disabled={refreshingSponsors}
+              variant="outline"
+              className="border-gray-300"
+            >
+              {refreshingSponsors ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Refresh
+                </>
+              )}
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {sponsors.length === 0 ? (
+            <p className="text-gray-800">No sponsors yet.</p>
+          ) : (
+            sponsors.map((sponsor) => (
+              <div key={sponsor.address} className="border rounded-lg p-4 bg-gray-50">
+                <div className="flex items-start justify-between gap-6">
+                  {/* Left: sponsor details */}
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      {sponsor.image && (
+                        <img src={sponsor.image} alt={sponsor.name} className="w-8 h-8 rounded-full object-cover" />
+                      )}
+                      <div>
+                        <p className="font-semibold text-black">{sponsor.name}</p>
+                        <p className="text-sm text-gray-600">{short(sponsor.address)}</p>
+                      </div>
+                      {sponsor.isBlocked && (
+                        <Badge variant="destructive" className="text-xs">
+                          BLOCKED
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-xs text-gray-600 font-medium">Contributions:</p>
+                      {sponsor.totalContributions.map((contribution, idx) => (
+                        <p key={idx} className="text-xs text-gray-700">
+                          {contribution.symbol || short(contribution.token)}: {formatEther(contribution.amount)}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Right: block/unblock controls */}
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => handleBlockSponsor(sponsor.address, !sponsor.isBlocked)}
+                      disabled={blockingSponsor[sponsor.address]}
+                      variant={sponsor.isBlocked ? "default" : "destructive"}
+                      className={sponsor.isBlocked ? "bg-green-600 hover:bg-green-700" : ""}
+                    >
+                      {blockingSponsor[sponsor.address] ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                          {sponsor.isBlocked ? 'Unblocking...' : 'Blocking...'}
+                        </>
+                      ) : (
+                        <>
+                          {sponsor.isBlocked ? (
+                            <>
+                              <Eye className="w-4 h-4 mr-2" />
+                              Unblock
+                            </>
+                          ) : (
+                            <>
+                              <EyeOff className="w-4 h-4 mr-2" />
+                              Block
+                            </>
+                          )}
+                        </>
+                      )}
+                    </Button>
+                    <p className="text-xs text-gray-600 text-center">
+                      {sponsor.isBlocked ? 'Hidden from public view' : 'Visible to participants'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Prize Pool Overview */}
+      <Card className="bg-white">
+        <CardHeader>
+          <CardTitle className="text-black">Prize Pool</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          {approvedTokens.length === 0 ? (
-            <p className="text-gray-800">No approved tokens yet.</p>
+          {depositedTokens.length === 0 ? (
+            <p className="text-gray-800">No prize pool yet.</p>
           ) : (
-            approvedTokens.map((t) => (
+            depositedTokens.map((t) => (
               <div key={t.token} className="flex items-center justify-between border rounded-lg p-4 bg-gray-50">
                 <div>
                   <p className="font-semibold text-black">{t.token === '0x0000000000000000000000000000000000000000' ? 'Native ETH' : (t.symbol || short(t.token))}</p>
-                  <p className="text-xs text-gray-600">
-                    Min: {
-                      t.token === '0x0000000000000000000000000000000000000000'
-                        ? '1 Wei' // Hardcode ETH minimum to 1 Wei
-                        : BigInt(t.minAmount) > BigInt(0) 
-                          ? formatTokenAmount(t.minAmount, t.token, t.decimals)
-                          : 'No minimum'
-                    }
-                  </p>
+                  <p className="text-xs text-gray-600">{t.token === '0x0000000000000000000000000000000000000000' ? 'ETH' : short(t.token)}</p>
                 </div>
                 <Badge variant="outline" className="text-black border-gray-400">
-                  Total: {formatTokenAmount(t.totalAmount, t.token, t.decimals)}
+                  Total: {t.totalAmount} {t.symbol}
                 </Badge>
               </div>
             ))

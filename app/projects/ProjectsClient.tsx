@@ -193,7 +193,7 @@ export default function ProjectsClient() {
       let localTokenTotals: Record<string, bigint> = {}
       let localTokenSymbols: Record<string, string> = {}
       try {
-        const tokens = await publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'getApprovedTokensList' }) as string[]
+        const tokens = await publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'getDepositedTokensList' }) as string[]
         setApprovedTokens(tokens)
         const symbols: Record<string, string> = {}
         const totals: Record<string, bigint> = {}
