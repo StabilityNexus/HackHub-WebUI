@@ -1,27 +1,7 @@
 export const SPONSORSHIP_LIB_ABI = [
   { "type": "error", "name": "TokenTransferFailed", "inputs": [] },
   { "type": "error", "name": "InvalidParams", "inputs": [] },
-  { "type": "error", "name": "TokenNotApproved", "inputs": [] },
-  { "type": "error", "name": "TokenAlreadySubmitted", "inputs": [] },
-  {
-    "type": "event",
-    "name": "TokenSubmitted",
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "token", "type": "address" },
-      { "indexed": false, "internalType": "string", "name": "name", "type": "string" },
-      { "indexed": true, "internalType": "address", "name": "submitter", "type": "address" }
-    ]
-  },
-  {
-    "type": "event",
-    "name": "TokenApproved",
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "token", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "minAmount", "type": "uint256" }
-    ]
-  },
+  { "type": "error", "name": "SponsorNotFound", "inputs": [] },
   {
     "type": "event",
     "name": "SponsorDeposited",
@@ -34,33 +14,19 @@ export const SPONSORSHIP_LIB_ABI = [
   },
   {
     "type": "event",
-    "name": "SponsorListed",
+    "name": "SponsorBlocked",
     "anonymous": false,
     "inputs": [
-      { "indexed": true, "internalType": "address", "name": "sponsor", "type": "address" },
-      { "indexed": true, "internalType": "address", "name": "token", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+      { "indexed": true, "internalType": "address", "name": "sponsor", "type": "address" }
     ]
   },
   {
-    "type": "function",
-    "stateMutability": "nonpayable",
-    "name": "submitToken",
+    "type": "event",
+    "name": "SponsorUnblocked",
+    "anonymous": false,
     "inputs": [
-      { "internalType": "address", "name": "token", "type": "address" },
-      { "internalType": "string", "name": "tokenName", "type": "string" }
-    ],
-    "outputs": []
-  },
-  {
-    "type": "function",
-    "stateMutability": "nonpayable",
-    "name": "approveToken",
-    "inputs": [
-      { "internalType": "address", "name": "token", "type": "address" },
-      { "internalType": "uint256", "name": "minAmount", "type": "uint256" }
-    ],
-    "outputs": []
+      { "indexed": true, "internalType": "address", "name": "sponsor", "type": "address" }
+    ]
   },
   {
     "type": "function",
@@ -71,16 +37,6 @@ export const SPONSORSHIP_LIB_ABI = [
       { "internalType": "uint256", "name": "amount", "type": "uint256" },
       { "internalType": "string", "name": "sponsorName", "type": "string" },
       { "internalType": "string", "name": "sponsorImageURL", "type": "string" }
-    ],
-    "outputs": []
-  },
-  {
-    "type": "function",
-    "stateMutability": "payable",
-    "name": "addOrganizerFunds",
-    "inputs": [
-      { "internalType": "address", "name": "token", "type": "address" },
-      { "internalType": "uint256", "name": "amount", "type": "uint256" }
     ],
     "outputs": []
   },
@@ -121,35 +77,6 @@ export const SPONSORSHIP_LIB_ABI = [
   {
     "type": "function",
     "stateMutability": "view",
-    "name": "getTokenMinAmount",
-    "inputs": [
-      { "internalType": "address", "name": "token", "type": "address" }
-    ],
-    "outputs": [
-      { "internalType": "uint256", "name": "", "type": "uint256" }
-    ]
-  },
-  {
-    "type": "function",
-    "stateMutability": "view",
-    "name": "getApprovedTokensList",
-    "inputs": [],
-    "outputs": [
-      { "internalType": "address[]", "name": "", "type": "address[]" }
-    ]
-  },
-  {
-    "type": "function",
-    "stateMutability": "view",
-    "name": "getSubmittedTokensList",
-    "inputs": [],
-    "outputs": [
-      { "internalType": "address[]", "name": "", "type": "address[]" }
-    ]
-  },
-  {
-    "type": "function",
-    "stateMutability": "view",
     "name": "getAllSponsors",
     "inputs": [],
     "outputs": [
@@ -159,14 +86,10 @@ export const SPONSORSHIP_LIB_ABI = [
   {
     "type": "function",
     "stateMutability": "view",
-    "name": "getTokenSubmission",
-    "inputs": [
-      { "internalType": "address", "name": "token", "type": "address" }
-    ],
+    "name": "getDepositedTokensList",
+    "inputs": [],
     "outputs": [
-      { "internalType": "string", "name": "name", "type": "string" },
-      { "internalType": "address", "name": "submitter", "type": "address" },
-      { "internalType": "bool", "name": "exists", "type": "bool" }
+      { "internalType": "address[]", "name": "", "type": "address[]" }
     ]
   },
   {
@@ -183,10 +106,28 @@ export const SPONSORSHIP_LIB_ABI = [
   },
   {
     "type": "function",
-    "stateMutability": "view",
-    "name": "isTokenApproved",
+    "stateMutability": "nonpayable",
+    "name": "blockSponsor",
     "inputs": [
-      { "internalType": "address", "name": "token", "type": "address" }
+      { "internalType": "address", "name": "sponsor", "type": "address" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "stateMutability": "nonpayable",
+    "name": "unblockSponsor",
+    "inputs": [
+      { "internalType": "address", "name": "sponsor", "type": "address" }
+    ],
+    "outputs": []
+  },
+  {
+    "type": "function",
+    "stateMutability": "view",
+    "name": "isSponsorBlocked",
+    "inputs": [
+      { "internalType": "address", "name": "sponsor", "type": "address" }
     ],
     "outputs": [
       { "internalType": "bool", "name": "", "type": "bool" }

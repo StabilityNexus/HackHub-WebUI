@@ -73,8 +73,7 @@ export default function InteractionClient() {
   const [syncing, setSyncing] = useState(false)
   const [lastSynced, setLastSynced] = useState<Date | null>(null)
   const [submissionOpen, setSubmissionOpen] = useState(false)
-  const [approvedTokens, setApprovedTokens] = useState<string[]>([])
-  const [tokenMinAmounts, setTokenMinAmounts] = useState<Record<string, bigint>>({})
+  const [depositedTokens, setDepositedTokens] = useState<string[]>([])
   const [tokenSymbols, setTokenSymbols] = useState<Record<string, string>>({})
   const [tokenTotals, setTokenTotals] = useState<Record<string, bigint>>({})
   const [tokenDecimals, setTokenDecimals] = useState<Record<string, number>>({})
@@ -85,9 +84,6 @@ export default function InteractionClient() {
   const [sponsorName, setSponsorName] = useState<string>("")
   const [sponsorImage, setSponsorImage] = useState<string>("")
   const [isDepositing, setIsDepositing] = useState(false)
-  const [isSubmittingToken, setIsSubmittingToken] = useState(false)
-  const [submitTokenAddress, setSubmitTokenAddress] = useState<string>("")
-  const [submitTokenName, setSubmitTokenName] = useState<string>("")
   const [submitting, setSubmitting] = useState(false)
   const [needsApproval, setNeedsApproval] = useState(false)
   const [isApprovingToken, setIsApprovingToken] = useState(false)
@@ -217,27 +213,18 @@ export default function InteractionClient() {
 
       // Load approved tokens and their minimums (optional on legacy contracts)
       // Use local copies within this function to avoid relying on async state updates
-      let localApprovedTokens: string[] = []
+      let localDepositedTokens: string[] = []
       let localTokenTotals: Record<string, bigint> = {}
       let localTokenSymbols: Record<string, string> = {}
       let localSponsors: Sponsor[] = []
       try {
-        const tokens = await publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'getApprovedTokensList' }) as string[]
-        console.log('Approved tokens from contract:', tokens)
-        setApprovedTokens(tokens)
-        const mins: Record<string, bigint> = {}
+        const tokens = await publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'getDepositedTokensList' }) as string[]
+        console.log('Deposited tokens from contract:', tokens)
+        setDepositedTokens(tokens)
         const symbols: Record<string, string> = {}
         const totals: Record<string, bigint> = {}
         const decimalsMap: Record<string, number> = {}
         for (const t of tokens) {
-          try {
-            const min = await publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'getTokenMinAmount', args: [t as `0x${string}`] }) as bigint
-            mins[t] = min
-            console.log(`✅ Token ${t} min amount:`, min.toString(), 'BigInt value:', min)
-          } catch (e) {
-            console.warn(`❌ Failed to get min amount for token ${t}:`, e)
-            mins[t] = BigInt(0)
-          }
           try {
             const total = await publicClient.readContract({ address: contractAddress, abi: HACKHUB_ABI, functionName: 'getTokenTotal', args: [t as `0x${string}`] }) as bigint
             totals[t] = total
@@ -265,13 +252,11 @@ export default function InteractionClient() {
             }
           }
         }
-        console.log('📊 Setting tokenMinAmounts state:', mins)
-        setTokenMinAmounts(mins)
         setTokenSymbols(symbols)
         setTokenTotals(totals)
         setTokenDecimals(decimalsMap)
         // capture for local computation later in this call
-        localApprovedTokens = tokens
+        localDepositedTokens = tokens
         localTokenTotals = totals
         localTokenSymbols = symbols
         // Fetch sponsors via direct getter if available; fallback to logs
@@ -365,12 +350,11 @@ export default function InteractionClient() {
         }
       } catch (e) {
         console.warn('Sponsorship functions unavailable on this contract, continuing without approved tokens.', e)
-        setApprovedTokens([])
-        setTokenMinAmounts({})
+        setDepositedTokens([])
         setTokenSymbols({})
         setTokenTotals({})
         setSponsors([])
-        localApprovedTokens = []
+        localDepositedTokens = []
         localTokenTotals = {}
         localTokenSymbols = {}
         localSponsors = []
@@ -448,7 +432,7 @@ export default function InteractionClient() {
             const total = Number(totalTokens)
             const sharePercent = total > 0 ? (Number(projectTokens) / total) * 100 : 0
             // Compute per-token payout amounts (formatted as whole numbers)
-            const payouts = localApprovedTokens.map((t) => {
+            const payouts = localDepositedTokens.map((t: string) => {
               const poolTotal = localTokenTotals[t] ?? BigInt(0)
               const denom = totalTokens === BigInt(0) ? BigInt(1) : totalTokens
               const amount = (poolTotal * (projectTokens as bigint)) / denom
@@ -503,8 +487,7 @@ export default function InteractionClient() {
         // Save extended hackathon details including all interaction data
         await hackathonDB.setExtendedHackathonDetails(contractAddress, chainId, {
           hackathonData: hackathon,
-          approvedTokens: localApprovedTokens,
-          tokenMinAmounts: tokenMinAmounts,
+          depositedTokens: localDepositedTokens,
           tokenSymbols: localTokenSymbols,
           tokenTotals: localTokenTotals,
           tokenDecimals: tokenDecimals,
@@ -619,8 +602,7 @@ export default function InteractionClient() {
           console.log('📊 Loading hackathon data from cache with judges:', cached.hackathonData.judges?.length, cached.hackathonData.judges)
           // Restore all state from cache (types are already converted by IndexedDB)
           setHackathonData(cached.hackathonData)
-          setApprovedTokens(cached.approvedTokens)
-          setTokenMinAmounts(cached.tokenMinAmounts)
+          setDepositedTokens(cached.depositedTokens || [])
           setTokenSymbols(cached.tokenSymbols)
           setTokenTotals(cached.tokenTotals)
           setTokenDecimals(cached.tokenDecimals)
@@ -928,54 +910,7 @@ export default function InteractionClient() {
     }
   }
 
-  const handleSubmitToken = async () => {
-    if (!contractAddress) return
-    if (!submitTokenAddress || !/^0x[a-fA-F0-9]{40}$/.test(submitTokenAddress)) {
-      return toast.error('Enter a valid ERC20 token address')
-    }
-    if (!submitTokenName.trim()) {
-      return toast.error('Provide a token name')
-    }
-    try {
-      // Preflight: avoid duplicate submission
-      try {
-        const publicClient = getPublicClient(config)
-        const [, , exists] = await publicClient.readContract({
-          address: contractAddress,
-          abi: HACKHUB_ABI,
-          functionName: 'getTokenSubmission',
-          args: [submitTokenAddress as `0x${string}`]
-        }) as [string, string, boolean]
-        if (exists) {
-          toast.error('This token has already been submitted')
-          return
-        }
-      } catch {
-        // If getter not available, continue; contract will enforce
-      }
 
-      setIsSubmittingToken(true)
-      await writeContract({
-        address: contractAddress,
-        abi: HACKHUB_ABI,
-        functionName: 'submitToken',
-        args: [submitTokenAddress as `0x${string}`, submitTokenName.trim()]
-      })
-      toast.success('Token submitted for approval')
-      setSubmitTokenAddress('')
-      setSubmitTokenName('')
-    } catch (e: any) {
-      console.error(e)
-      const msg = String(e?.message || '')
-      if (msg.includes('TokenAlreadySubmitted')) {
-        toast.error('Token already submitted')
-      } else {
-        toast.error(e?.message || 'Submit failed')
-      }
-    } finally {
-      setIsSubmittingToken(false)
-    }
-  }
 
   return (
     <div className="space-y-8">
@@ -1163,14 +1098,14 @@ export default function InteractionClient() {
           </Card>
 
           {/* Approved Tokens */}
-          {approvedTokens.length > 0 && (
+          {depositedTokens.length > 0 && (
             <Card className="border bg-white border-gray-300 shadow-sm">
               <CardHeader>
                 <CardTitle className="text-black">Prize Pool</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {approvedTokens.map((t) => (
+                  {depositedTokens.map((t) => (
                     <div key={t} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
                       <div className="text-sm text-gray-800">
                         <div className="font-semibold">{t === '0x0000000000000000000000000000000000000000' ? 'Native ETH' : (tokenSymbols[t] || short(t))}</div>
@@ -1178,17 +1113,6 @@ export default function InteractionClient() {
                       </div>
                       <div className="text-right text-xs text-gray-700">
                         <div>Total: {formatTokenAmount(tokenTotals[t] ?? BigInt(0), t)}</div>
-                        <div>Min deposit: {(() => {
-                          // Hardcode ETH minimum to 1 Wei
-                          if (t === '0x0000000000000000000000000000000000000000') {
-                            return '1 Wei' // 1 Wei = 0.000000000000000001 ETH, but showing practical minimum
-                          }
-                          const minAmount = tokenMinAmounts[t]
-                          if (minAmount !== undefined && minAmount > BigInt(0)) {
-                            return formatTokenAmount(minAmount, t)
-                          }
-                          return 'No minimum'
-                        })()}</div>
                       </div>
                     </div>
                   ))}
@@ -1310,22 +1234,7 @@ export default function InteractionClient() {
             </Card>
           )}
 
-          {/* Submit Token for Approval */}
-          <Card className="border bg-white border-gray-300 shadow-sm">
-            <CardHeader>
-              <CardTitle className="text-black">Submit Token for Approval</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Label className="text-sm">ERC20 Token Address</Label>
-              <Input value={submitTokenAddress} onChange={e => setSubmitTokenAddress(e.target.value)} placeholder="0x..." className="bg-white border-gray-300 text-black" />
-              <Label className="text-sm">Token Name</Label>
-              <Input value={submitTokenName} onChange={e => setSubmitTokenName(e.target.value)} placeholder="e.g., USDC" className="bg-white border-gray-300 text-black" />
-              <Button onClick={handleSubmitToken} disabled={isSubmittingToken || !submitTokenAddress} className="w-full bg-[#8B6914] text-white hover:bg-[#A0471D]">
-                {isSubmittingToken ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Submitting...</>) : 'Submit ERC20 Token'}
-              </Button>
-              <p className="text-xs text-gray-600">Submit ERC20 tokens for organizer approval. ETH is always available as a sponsorship option.</p>
-            </CardContent>
-          </Card>
+
 
           {/* Deposit / Sponsor */}
           <Card className="border bg-white border-gray-300 shadow-sm">
@@ -1333,14 +1242,23 @@ export default function InteractionClient() {
               <CardTitle className="text-black">Become a Sponsor</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Label className="text-sm">Select Token</Label>
+              <Label className="text-sm">Token Address (or ETH)</Label>
               <select className="w-full border rounded p-2 bg-white text-black" value={depositToken} onChange={e => setDepositToken(e.target.value)}>
-                <option value="">Choose token</option>
+                <option value="">Choose token or enter custom address</option>
                 <option value={'0x0000000000000000000000000000000000000000'}>Native ETH</option>
-                {approvedTokens.filter(t => t !== '0x0000000000000000000000000000000000000000').map(t => (
+                {depositedTokens.filter(t => t !== '0x0000000000000000000000000000000000000000').map(t => (
                   <option key={t} value={t}>{tokenSymbols[t] || short(t)}</option>
                 ))}
               </select>
+              <div className="mt-2">
+                <Label className="text-sm">Or enter custom ERC20 token address:</Label>
+                <Input 
+                  value={depositToken.startsWith('0x') && !depositedTokens.includes(depositToken) ? depositToken : ''} 
+                  onChange={e => setDepositToken(e.target.value)} 
+                  placeholder="0x..." 
+                  className="bg-white border-gray-300 text-black" 
+                />
+              </div>
               <Label className="text-sm">Amount</Label>
               <Input value={depositAmount} onChange={e => setDepositAmount(e.target.value)} placeholder={isERC20Selected ? 'Amount (e.g., 100)' : 'Amount in ETH (e.g., 0.5)'} className="bg-white border-gray-300 text-black" />
               {isERC20Selected && (
@@ -1360,17 +1278,9 @@ export default function InteractionClient() {
               <Button onClick={handleDeposit} disabled={Boolean(isDepositing || !depositToken || !depositAmount || (isERC20Selected && needsApproval))} className="w-full bg-[#8B6914] text-white hover:bg-[#A0471D]">
                 {isDepositing ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Depositing...</>) : 'Deposit'}
               </Button>
-              {depositToken && (
-                <p className="text-xs text-gray-600">
-                  Min amount to be listed: {
-                    depositToken === '0x0000000000000000000000000000000000000000'
-                      ? '0.0001 ETH' // Practical minimum for ETH
-                      : tokenMinAmounts[depositToken] !== undefined && tokenMinAmounts[depositToken] > BigInt(0) 
-                        ? formatTokenAmount(tokenMinAmounts[depositToken], depositToken)
-                        : 'No minimum required'
-                  }
-                </p>
-              )}
+              <p className="text-xs text-gray-600">
+                You can deposit any amount of ETH or any ERC20 token. Your contribution will be visible to all participants and will be distributed to winners based on their vote share.
+              </p>
             </CardContent>
           </Card>
 

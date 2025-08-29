@@ -15,16 +15,16 @@ export default function Navigation() {
       <div className="px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 flex items-center justify-center">
+            <div className="w-12 h-12 flex items-center justify-center">
               <Image 
                 src="/block.png" 
                 alt="HackHub Logo" 
-                width={32} 
-                height={32}
+                width={48} 
+                height={48}
                 className="object-contain"
               />
             </div>
-            <span className="font-bold text-xl bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
+            <span className="font-bold text-3xl bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
               HackHub
             </span>
           </Link>

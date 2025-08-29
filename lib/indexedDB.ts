@@ -346,8 +346,9 @@ class HackathonDB {
   // Extended hackathon details methods (includes all interaction data)
   async getExtendedHackathonDetails(contractAddress: string, chainId: number): Promise<{
     hackathonData: HackathonData
-    approvedTokens: string[]
-    tokenMinAmounts: Record<string, bigint>
+    depositedTokens?: string[]
+    approvedTokens?: string[]
+    tokenMinAmounts?: Record<string, bigint>
     tokenSymbols: Record<string, string>
     tokenTotals: Record<string, bigint>
     tokenDecimals: Record<string, number>
@@ -374,9 +375,9 @@ class HackathonDB {
             // Convert string bigints back to bigint
             const processed = {
               ...result,
-              tokenMinAmounts: Object.fromEntries(
+              tokenMinAmounts: result.tokenMinAmounts ? Object.fromEntries(
                 Object.entries(result.tokenMinAmounts).map(([k, v]) => [k, BigInt(v)])
-              ),
+              ) : undefined,
               tokenTotals: Object.fromEntries(
                 Object.entries(result.tokenTotals).map(([k, v]) => [k, BigInt(v)])
               ),
@@ -406,8 +407,9 @@ class HackathonDB {
     chainId: number, 
     data: {
       hackathonData: HackathonData
-      approvedTokens: string[]
-      tokenMinAmounts: Record<string, bigint>
+      depositedTokens?: string[]
+      approvedTokens?: string[]
+      tokenMinAmounts?: Record<string, bigint>
       tokenSymbols: Record<string, string>
       tokenTotals: Record<string, bigint>
       tokenDecimals: Record<string, number>
@@ -426,9 +428,9 @@ class HackathonDB {
       // Convert bigints to strings for serialization
       const entry: ExtendedHackathonDetails = {
         ...data,
-        tokenMinAmounts: Object.fromEntries(
+        tokenMinAmounts: data.tokenMinAmounts ? Object.fromEntries(
           Object.entries(data.tokenMinAmounts).map(([k, v]) => [k, v.toString()])
-        ),
+        ) : undefined,
         tokenTotals: Object.fromEntries(
           Object.entries(data.tokenTotals).map(([k, v]) => [k, v.toString()])
         ),

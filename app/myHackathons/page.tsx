@@ -177,7 +177,7 @@ function MyHackathonsPageContent() {
         approvedTokens = await publicClient.readContract({
           address: addr,
           abi: HACKHUB_ABI,
-          functionName: 'getApprovedTokensList'
+          functionName: 'getDepositedTokensList'
         }) as string[]
         for (const t of approvedTokens) {
           try {

@@ -13,45 +13,6 @@ export const HACKHUB_ABI = [
     "stateMutability": "payable",
     "type": "constructor"
   },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "token", "type": "address" },
-      { "indexed": false, "internalType": "string", "name": "name", "type": "string" },
-      { "indexed": true, "internalType": "address", "name": "submitter", "type": "address" }
-    ],
-    "name": "TokenSubmitted",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "token", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "minAmount", "type": "uint256" }
-    ],
-    "name": "TokenApproved",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "sponsor", "type": "address" },
-      { "indexed": true, "internalType": "address", "name": "token", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
-    ],
-    "name": "SponsorDeposited",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      { "indexed": true, "internalType": "address", "name": "sponsor", "type": "address" },
-      { "indexed": true, "internalType": "address", "name": "token", "type": "address" },
-      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
-    ],
-    "name": "SponsorListed",
-    "type": "event"
-  },
   { "inputs": [], "name": "InvalidParams", "type": "error" },
   { "inputs": [], "name": "NotJudge", "type": "error" },
   { "inputs": [], "name": "SubmissionClosed", "type": "error" },
@@ -62,6 +23,13 @@ export const HACKHUB_ABI = [
   { "inputs": [], "name": "AlreadyConcluded", "type": "error" },
   { "inputs": [], "name": "AlreadySubmitted", "type": "error" },
   { "inputs": [], "name": "TokenTransferFailed", "type": "error" },
+  {
+    "inputs": [
+      { "indexed": false, "internalType": "address", "name": "account", "type": "address" }
+    ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
   {
     "anonymous": false,
     "inputs": [
@@ -88,6 +56,32 @@ export const HACKHUB_ABI = [
       { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
     ],
     "name": "PrizeClaimed",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "sponsor", "type": "address" },
+      { "indexed": true, "internalType": "address", "name": "token", "type": "address" },
+      { "indexed": false, "internalType": "uint256", "name": "amount", "type": "uint256" }
+    ],
+    "name": "SponsorDeposited",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "sponsor", "type": "address" }
+    ],
+    "name": "SponsorBlocked",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      { "indexed": true, "internalType": "address", "name": "sponsor", "type": "address" }
+    ],
+    "name": "SponsorUnblocked",
     "type": "event"
   },
   {
@@ -146,22 +140,18 @@ export const HACKHUB_ABI = [
   { "inputs": [], "name": "concludeHackathon", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
   { "inputs": [{ "internalType": "uint256", "name": "projectId", "type": "uint256" }], "name": "claimPrize", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
   { "inputs": [{ "internalType": "address", "name": "judge", "type": "address" }, { "internalType": "uint256", "name": "amount", "type": "uint256" }], "name": "adjustJudgeTokens", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
-  { "inputs": [{ "internalType": "uint256", "name": "additionalAmount", "type": "uint256" }], "name": "increasePrizePool", "outputs": [], "stateMutability": "payable", "type": "function" },
-  { "inputs": [{ "internalType": "address", "name": "token", "type": "address" }, { "internalType": "string", "name": "tokenName", "type": "string" }], "name": "submitToken", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
-  { "inputs": [{ "internalType": "address", "name": "token", "type": "address" }, { "internalType": "uint256", "name": "minAmount", "type": "uint256" }], "name": "approveToken", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
   { "inputs": [{ "internalType": "address", "name": "token", "type": "address" }, { "internalType": "uint256", "name": "amount", "type": "uint256" }, { "internalType": "string", "name": "sponsorName", "type": "string" }, { "internalType": "string", "name": "sponsorImageURL", "type": "string" }], "name": "depositToToken", "outputs": [], "stateMutability": "payable", "type": "function" },
   { "inputs": [], "name": "projectCount", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
   { "inputs": [], "name": "judgeCount", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
   { "inputs": [], "name": "getAllJudges", "outputs": [{ "internalType": "address[]", "name": "", "type": "address[]" }], "stateMutability": "view", "type": "function" },
   { "inputs": [], "name": "getParticipants", "outputs": [{ "internalType": "address[]", "name": "", "type": "address[]" }], "stateMutability": "view", "type": "function" },
   { "inputs": [{ "internalType": "address", "name": "token", "type": "address" }], "name": "getTokenTotal", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [{ "internalType": "address", "name": "sponsor", "type": "address" }, { "internalType": "address", "name": "token", "type": "address" }], "name": "getSponsorTokenAmount", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [{ "internalType": "address", "name": "token", "type": "address" }], "name": "getTokenMinAmount", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [], "name": "getApprovedTokensList", "outputs": [{ "internalType": "address[]", "name": "", "type": "address[]" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "getDepositedTokensList", "outputs": [{ "internalType": "address[]", "name": "", "type": "address[]" }], "stateMutability": "view", "type": "function" },
   { "inputs": [{ "internalType": "address", "name": "sponsor", "type": "address" }], "name": "getSponsorProfile", "outputs": [{ "internalType": "string", "name": "sponsorName", "type": "string" }, { "internalType": "string", "name": "sponsorImageURL", "type": "string" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [], "name": "getSubmittedTokensList", "outputs": [{ "internalType": "address[]", "name": "", "type": "address[]" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [{ "internalType": "address", "name": "token", "type": "address" }], "name": "getTokenSubmission", "outputs": [{ "internalType": "string", "name": "tokenName", "type": "string" }, { "internalType": "address", "name": "submitter", "type": "address" }, { "internalType": "bool", "name": "exists", "type": "bool" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "sponsor", "type": "address" }, { "internalType": "address", "name": "token", "type": "address" }], "name": "getSponsorTokenAmount", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" },
   { "inputs": [], "name": "getAllSponsors", "outputs": [{ "internalType": "address[]", "name": "", "type": "address[]" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [], "name": "owner", "outputs": [{ "internalType": "address", "name": "", "type": "address" }], "stateMutability": "view", "type": "function" },
-  { "inputs": [{ "internalType": "address", "name": "newOwner", "type": "address" }], "name": "transferOwnership", "outputs": [], "stateMutability": "nonpayable", "type": "function" }
+  { "inputs": [{ "internalType": "address", "name": "sponsor", "type": "address" }], "name": "blockSponsor", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "sponsor", "type": "address" }], "name": "unblockSponsor", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+  { "inputs": [{ "internalType": "address", "name": "sponsor", "type": "address" }], "name": "isSponsorBlocked", "outputs": [{ "internalType": "bool", "name": "", "type": "bool" }], "stateMutability": "view", "type": "function" },
+  { "inputs": [], "name": "owner", "outputs": [{ "internalType": "address", "name": "", "type": "address" }], "stateMutability": "view", "type": "function" }
 ] as const;

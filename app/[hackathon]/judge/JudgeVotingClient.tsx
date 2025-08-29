@@ -149,7 +149,7 @@ export default function JudgeVotingClient() {
         const tokens = await publicClient.readContract({
           address: contractAddress,
           abi: HACKHUB_ABI,
-          functionName: 'getApprovedTokensList'
+          functionName: 'getDepositedTokensList'
         }) as string[]
         setApprovedTokens(tokens)
         const totals: Record<string, bigint> = {}

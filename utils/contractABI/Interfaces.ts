@@ -121,6 +121,22 @@ export const OwnableABI = [
     stateMutability: "view"
   },
   {
+    type: "function",
+    name: "_checkOwner",
+    inputs: [],
+    outputs: [],
+    stateMutability: "view"
+  },
+  {
+    type: "function",
+    name: "_transferOwnership",
+    inputs: [
+      { name: "newOwner", type: "address", internalType: "address" }
+    ],
+    outputs: [],
+    stateMutability: "nonpayable"
+  },
+  {
     type: "event",
     name: "OwnershipTransferred",
     inputs: [
