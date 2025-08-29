@@ -5,8 +5,9 @@ interface ExtendedHackathonDetails {
   // Basic hackathon data
   hackathonData: HackathonData
   // Additional interaction data
-  approvedTokens: string[]
-  tokenMinAmounts: Record<string, string> // Store bigint as string for serialization
+  depositedTokens?: string[]
+  approvedTokens?: string[]
+  tokenMinAmounts?: Record<string, string> // Store bigint as string for serialization
   tokenSymbols: Record<string, string>
   tokenTotals: Record<string, string> // Store bigint as string for serialization
   tokenDecimals: Record<string, number>
