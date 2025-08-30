@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import Image from "next/image"
+const getImagePath = (path: string) => {
+  return path;
+};
 
 export default function Navigation() {
   const pathname = usePathname()
@@ -17,7 +20,7 @@ export default function Navigation() {
           <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="w-12 h-12 flex items-center justify-center">
               <Image 
-                src="/block.png" 
+                src={getImagePath("/block.png")} 
                 alt="HackHub Logo" 
                 width={48} 
                 height={48}
@@ -39,7 +42,7 @@ export default function Navigation() {
                     : "text-gray-700 hover:text-amber-800 hover:bg-amber-50/80"
                 } transition-all duration-200 font-medium`}
               >
-                Explorer Hackathons
+                Explore Hackathons
               </Button>
             </Link>
             <Link href="/createHackathon">

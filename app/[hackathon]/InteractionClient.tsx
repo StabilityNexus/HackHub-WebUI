@@ -1253,7 +1253,6 @@ export default function InteractionClient() {
               <div className="mt-2">
                 <Label className="text-sm">Or enter custom ERC20 token address:</Label>
                 <Input 
-                  value={depositToken.startsWith('0x') && !depositedTokens.includes(depositToken) ? depositToken : ''} 
                   onChange={e => setDepositToken(e.target.value)} 
                   placeholder="0x..." 
                   className="bg-white border-gray-300 text-black" 
