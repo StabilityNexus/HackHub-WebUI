@@ -5,9 +5,10 @@ import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ConnectButton } from '@rainbow-me/rainbowkit'
-import Image from "next/image"
+// Helper function to get the correct image path for GitHub Pages
 const getImagePath = (path: string) => {
-  return path;
+  // For static export, we need to ensure the path works with GitHub Pages
+  return path.startsWith('/') ? path : `/${path}`;
 };
 
 export default function Navigation() {
@@ -19,7 +20,7 @@ export default function Navigation() {
         <div className="flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
             <div className="w-12 h-12 flex items-center justify-center">
-              <Image 
+              <img 
                 src={getImagePath("/block.png")} 
                 alt="HackHub Logo" 
                 width={48} 
