@@ -211,15 +211,23 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero Section - Full Viewport Height */}
-      <div className="min-h-screen flex items-center justify-center relative">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+      <div className="min-h-screen flex items-center justify-center relative px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        <div className="hidden lg:flex absolute inset-0 items-center justify-end overflow-hidden">
+          <img 
+            src={getImagePath("/handRevolution.png")} 
+            alt="HackHub - Think, Build, Innovate" 
+            className="w-[450px] xl:w-[500px] h-auto object-contain opacity-90 drop-shadow-2xl"
+          />
+        </div>
+
+        <div className="w-full max-w-7xl mx-auto relative z-10">
+          <div className="flex flex-col lg:grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
             {/* Left side - Welcome to HackHub */}
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6 w-full">
               <div className="relative">            
                 {/* Main heading with enhanced styling */}
-                <div className="relative z-10 -mt-24 pb-8">
-                  <h1 className="text-6xl lg:text-7xl font-black leading-tight">
+                <div className="relative">
+                  <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-tight">
                     <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 drop-shadow-sm">
                       <DecryptedText 
                         text="Welcome to the On-Chain"
@@ -232,7 +240,7 @@ export default function HomePage() {
                         encryptedClassName="text-amber-400/40"
                       />
                     </span>
-                    <span className="block text-6xl lg:text-8xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-orange-600 to-amber-800 mt-4 tracking-tight">
+                    <span className="block text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-orange-600 to-amber-800 mt-2 sm:mt-4 tracking-tight">
                       <DecryptedText 
                         text="Hackathon Hub."
                         animateOn="view"
@@ -247,10 +255,10 @@ export default function HomePage() {
                   </h1>
                   
                   {/* Accent line */}
-                   <div className="mt-6 w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg"></div>
+                   <div className="mt-4 sm:mt-6 w-20 sm:w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg"></div>
                    
-                   <div className="mt-8">
-                     <p className="text-xl lg:text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-600 tracking-wider">
+                   <div className="mt-6 sm:mt-8">
+                     <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-600 tracking-wider">
                        <DecryptedText 
                          text="Transparent. Permissionless. Intuitive."
                          animateOn="view"
@@ -267,57 +275,55 @@ export default function HomePage() {
               </div>
             </div>
             
-            {/* Right side - HackHub image */}
-            <div className="flex justify-center lg:justify-end pt-0">
-              <div className="relative -mt-8 pb-8">
-                <img 
-                  src={getImagePath("/handRevolution.png")} 
-                  alt="HackHub - Think, Build, Innovate" 
-                  className="w-full max-w-md h-auto object-contain drop-shadow-2xl"
-                />
-              </div>
+            {/* Right side - Image shown below text on mobile/tablet */}
+            <div className="flex justify-center lg:hidden w-full mt-8">
+              <img 
+                src={getImagePath("/handRevolution.png")} 
+                alt="HackHub - Think, Build, Innovate" 
+                className="w-[280px] sm:w-[350px] md:w-[400px] h-auto object-contain drop-shadow-2xl opacity-80"
+              />
             </div>
           </div>
         </div>
         
         {/* Scroll Indicator */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-          <div className="flex flex-col items-center space-y-2">
-            <span className="text-sm text-amber-600 font-medium">Scroll to explore</span>
-            <ChevronDown className="w-6 h-6 text-amber-600" />
+        <div className="absolute bottom-4 sm:bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
+          <div className="flex flex-col items-center space-y-1 sm:space-y-2">
+            <span className="text-xs sm:text-sm text-amber-600 font-medium">Scroll to explore</span>
+            <ChevronDown className="w-5 h-5 sm:w-6 sm:h-6 text-amber-600" />
           </div>
         </div>
       </div>
 
       {/* Revolution Section with Hackathons Carousel */}
-      <div className="min-h-screen py-16">
-        <div className="container mx-auto">
-          <div className="space-y-8">
+      <div className="min-h-screen py-8 sm:py-12 lg:py-16 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16">
+        <div className="w-full max-w-7xl mx-auto">
+          <div className="space-y-6 sm:space-y-8">
               {/* Revolution Text - Moved Higher */}
-              <div className="relative -mt-8">
+              <div className="relative">
                 {/* Small decorative elements */}
                 
-                <div className="relative z-10 mt-">
-                  <div className="flex items-center justify-between">
+                <div className="relative z-10">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
                     <div>
-                      <h2 className="text-4xl lg:text-5xl font-black leading-tight">
+                      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black leading-tight">
                         <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700">
                           Think. Build. Innovate.
                         </span>
                       </h2>
                       
                       {/* Accent line */}
-                      <div className="mt-6 w-20 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg"></div>
+                      <div className="mt-4 sm:mt-6 w-16 sm:w-20 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg"></div>
                     </div>
                     
                     {/* Sync Button */}
-                    <div className="flex flex-col items-end">
+                    <div className="flex flex-col items-start sm:items-end w-full sm:w-auto">
                       <Button
                         onClick={handleSync}
                         disabled={syncing || loading}
                         variant="outline"
                         size="sm"
-                        className="border-amber-300 text-amber-700 hover:bg-amber-50 mb-2"
+                        className="border-amber-300 text-amber-700 hover:bg-amber-50 mb-2 w-full sm:w-auto"
                       >
                         <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
                         {syncing ? 'Syncing...' : 'Sync'}
@@ -334,7 +340,7 @@ export default function HomePage() {
               
               {/* Circular Hackathons Carousel - Right Side */}
               {!loading && !error && recentHackathons.length > 0 && (
-                <div className="overflow-hidden h-[50vh]">
+                <div className="overflow-hidden h-[40vh] sm:h-[45vh] md:h-[50vh]">
                   <div className="relative h-full flex items-center">
                     {/* Infinite scrolling container */}
                     <div className="flex animate-scroll-left">
@@ -344,12 +350,12 @@ export default function HomePage() {
                         const statusBadge = getStatusBadge(status)
                         
                         return (
-                                                <div key={`${hackathon.contractAddress}-${index}`} className="flex-shrink-0 mx-4">
+                          <div key={`${hackathon.contractAddress}-${index}`} className="flex-shrink-0 mx-2 sm:mx-3 md:mx-4">
                         <Link 
                           href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}
                           className="block"
                         >
-                          <Card className="w-[350px] bg-white border border-gray-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer">
+                          <Card className="w-[280px] sm:w-[320px] md:w-[350px] bg-white border border-gray-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer">
                                 <CardContent className="p-5">
                                   <div className="space-y-3">
                                     {/* Header */}
@@ -398,20 +404,20 @@ export default function HomePage() {
               
               {/* Loading State - Right Side */}
               {loading && (
-                <div className="flex justify-center items-center h-[50vh]">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-300"></div>
+                <div className="flex justify-center items-center h-[40vh] sm:h-[45vh] md:h-[50vh]">
+                  <div className="animate-spin rounded-full h-10 w-10 sm:h-12 sm:w-12 border-b-2 border-amber-300"></div>
                 </div>
               )}
               
               {/* Error State - Right Side */}
               {error && (
-                <div className="flex items-center justify-center h-[50vh]">
-                  <div className="bg-red-50/80 rounded-lg p-6 max-w-md">
-                    <p className="font-medium text-red-600">{error}</p>
+                <div className="flex items-center justify-center h-[40vh] sm:h-[45vh] md:h-[50vh] px-4">
+                  <div className="bg-red-50/80 rounded-lg p-4 sm:p-6 max-w-md w-full">
+                    <p className="font-medium text-red-600 text-sm sm:text-base">{error}</p>
                     <Button 
                       onClick={() => loadRecentHackathons(true)} 
                       variant="outline" 
-                      className="mt-4"
+                      className="mt-4 w-full sm:w-auto"
                     >
                       Try Again
                     </Button>
@@ -421,13 +427,13 @@ export default function HomePage() {
               
               {/* Empty State - Right Side */}
               {!loading && !error && recentHackathons.length === 0 && (
-                <div className="flex items-center justify-center h-[50vh]">
-                  <div className="bg-white/50 rounded-lg p-8 max-w-md text-center">
-                    <Zap className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No hackathons found</h3>
-                    <p className="text-muted-foreground mb-4">Be the first to create an exciting hackathon!</p>
+                <div className="flex items-center justify-center h-[40vh] sm:h-[45vh] md:h-[50vh] px-4">
+                  <div className="bg-white/50 rounded-lg p-6 sm:p-8 max-w-md text-center w-full">
+                    <Zap className="w-12 h-12 sm:w-16 sm:h-16 text-amber-500 mx-auto mb-4" />
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">No hackathons found</h3>
+                    <p className="text-sm sm:text-base text-muted-foreground mb-4">Be the first to create an exciting hackathon!</p>
                     <Link href="/createHackathon">
-                      <Button className="bg-amber-600 hover:bg-amber-700">
+                      <Button className="bg-amber-600 hover:bg-amber-700 w-full sm:w-auto">
                         <Plus className="w-4 h-4 mr-2" />
                         Create Hackathon
                       </Button>
