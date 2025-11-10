@@ -388,18 +388,18 @@ function ExplorerPageContent() {
 
   if (loading) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4 sm:py-6 lg:py-8">
         <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
             Explore Hackathons
           </h1>
         </div>
         
         <div className="flex items-center justify-center py-12">
           <div className="text-center space-y-4">
-            <Loader2 className="w-8 h-8 animate-spin mx-auto text-amber-600" />
-            <p className="text-muted-foreground">Loading hackathons from blockchain...</p>
-            <p className="text-sm text-muted-foreground">
+            <Loader2 className="w-6 h-6 sm:w-8 sm:h-8 animate-spin mx-auto text-amber-600" />
+            <p className="text-sm sm:text-base text-muted-foreground">Loading hackathons from blockchain...</p>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               {isConnected ? `Fetching from ${getNetworkName(chainId)}` : 'Please connect your wallet'}
             </p>
           </div>
@@ -410,12 +410,12 @@ function ExplorerPageContent() {
 
   if (error) {
     return (
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4 sm:py-6 lg:py-8">
         <div className="text-center space-y-4">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
             Explore Hackathons
           </h1>
-          <p className="text-muted-foreground text-lg">Discover amazing Web3 hackathons and join the innovation</p>
+          <p className="text-sm sm:text-base md:text-lg text-muted-foreground">Discover amazing Web3 hackathons and join the innovation</p>
           
           {/* Network Status */}
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
@@ -461,21 +461,21 @@ function ExplorerPageContent() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8 px-4 sm:px-6 md:px-8 lg:px-12 xl:px-16 py-4 sm:py-6 lg:py-8">
       <div className="text-center space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex-1"></div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex-1 hidden sm:block"></div>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
             Explore Hackathons
           </h1>
-          <div className="flex-1 flex justify-end">
-            <div className="flex flex-col items-end">
+          <div className="flex-1 flex justify-center sm:justify-end w-full sm:w-auto">
+            <div className="flex flex-col items-center sm:items-end w-full sm:w-auto">
               <Button
                 onClick={handleSync}
                 disabled={syncing || loading}
                 variant="outline"
                 size="sm"
-                className="border-amber-300 text-amber-700 hover:bg-amber-50 mb-2"
+                className="border-amber-300 text-amber-700 hover:bg-amber-50 mb-2 w-full sm:w-auto"
               >
                 <RotateCcw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
                 {syncing ? 'Syncing...' : 'Sync'}
@@ -491,7 +491,7 @@ function ExplorerPageContent() {
       </div>
 
       {/* Search and Filters */}
-      <div className="flex flex-col lg:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
           <Input 
@@ -502,9 +502,9 @@ function ExplorerPageContent() {
           />
         </div>
         
-        <div className="flex gap-2 flex-wrap lg:flex-nowrap">
+        <div className="flex gap-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-full lg:w-[140px] bg-white text-[#8B6914]">
+            <SelectTrigger className="w-full sm:w-[160px] bg-white text-[#8B6914]">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -520,26 +520,26 @@ function ExplorerPageContent() {
 
       {/* Results Info */}
       {effectiveTotal > 0 && (
-        <div className="flex items-center justify-between text-sm text-gray-600">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-gray-600">
           <span>
             Showing {startItem}-{endItem} of {effectiveTotal} hackathons
             {hasActiveFilters && ` (filtered from ${totalHackathons} total)`}
           </span>
-          <span>
+          <span className="text-xs sm:text-sm">
             Page {currentPage} of {totalPages}
           </span>
         </div>
       )}
 
       {/* Hackathons List */}
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         {/* Active, Upcoming & Judging Hackathons */}
         {displayHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'concluded').length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-amber-800 border-b border-amber-200 pb-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-amber-800 border-b border-amber-200 pb-2">
               🔥 Active, Upcoming & Judging Hackathons
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {displayHackathons
                 .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) !== 'concluded')
                 .sort((a, b) => {
@@ -651,10 +651,10 @@ function ExplorerPageContent() {
         {/* Past Hackathons */}
         {displayHackathons.filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'concluded').length > 0 && (
           <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-gray-700 border-b border-gray-200 pb-2">
+            <h2 className="text-xl sm:text-2xl font-bold text-gray-700 border-b border-gray-200 pb-2">
               ✅ Past Hackathons
             </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
               {displayHackathons
                 .filter(h => getHackathonStatus(h.startTime, h.endTime, h.concluded) === 'concluded')
                 .map((hackathon) => {
@@ -730,19 +730,19 @@ function ExplorerPageContent() {
 
       {/* Pagination Controls */}
       {(totalPages > 1 || (!loading && currentPage > 1)) && (
-        <div className="flex items-center justify-center space-x-2">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             disabled={currentPage === 1}
-            className="border-amber-300 text-amber-700 hover:bg-amber-50"
+            className="border-amber-300 text-amber-700 hover:bg-amber-50 w-full sm:w-auto"
           >
             <ChevronLeft className="w-4 h-4 mr-1" />
             Previous
           </Button>
           
-          <div className="flex items-center space-x-1">
+          <div className="flex items-center gap-1 overflow-x-auto px-2">
             {Array.from({ length: Math.min(5, Math.max(1, totalPages)) }, (_, i) => {
               const safeTotalPages = Math.max(1, totalPages)
               let pageNum
@@ -763,8 +763,8 @@ function ExplorerPageContent() {
                   size="sm"
                   onClick={() => setCurrentPage(pageNum)}
                   className={currentPage === pageNum 
-                    ? "bg-amber-600 text-white hover:bg-amber-700" 
-                    : "border-amber-300 text-amber-700 hover:bg-amber-50"
+                    ? "bg-amber-600 text-white hover:bg-amber-700 min-w-[40px]" 
+                    : "border-amber-300 text-amber-700 hover:bg-amber-50 min-w-[40px]"
                   }
                 >
                   {pageNum}
@@ -778,7 +778,7 @@ function ExplorerPageContent() {
             size="sm"
             onClick={() => setCurrentPage(prev => Math.min(Math.max(1, totalPages), prev + 1))}
             disabled={currentPage === Math.max(1, totalPages)}
-            className="border-amber-300 text-amber-700 hover:bg-amber-50"
+            className="border-amber-300 text-amber-700 hover:bg-amber-50 w-full sm:w-auto"
           >
             Next
             <ChevronRight className="w-4 h-4 ml-1" />
@@ -788,12 +788,12 @@ function ExplorerPageContent() {
 
       {/* No Results */}
       {displayHackathons.length === 0 && hackathons.length > 0 && (
-        <div className="text-center py-12">
-          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-            <Search className="w-8 h-8 text-gray-400" />
+        <div className="text-center py-8 sm:py-12 px-4">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+            <Search className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No hackathons found</h3>
-          <p className="text-muted-foreground mb-4">
+          <h3 className="text-base sm:text-lg font-semibold mb-2">No hackathons found</h3>
+          <p className="text-sm sm:text-base text-muted-foreground mb-4">
             Try adjusting your search terms, category, or status filter
           </p>
           <Button 
@@ -801,7 +801,7 @@ function ExplorerPageContent() {
               setSearchTerm("")
               setStatusFilter("All Status")
             }}
-            className="bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white"
+            className="bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white w-full sm:w-auto"
           >
             Show All Hackathons
           </Button>
@@ -810,15 +810,15 @@ function ExplorerPageContent() {
 
       {/* Empty State - No hackathons on blockchain */}
       {hackathons.length === 0 && (
-        <div className="text-center py-12">
-          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
-            <Search className="w-8 h-8 text-gray-400" />
+        <div className="text-center py-8 sm:py-12 px-4">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+            <Search className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
           </div>
-          <h3 className="text-lg font-semibold mb-2">No hackathons found</h3>
-          <p className="text-muted-foreground mb-4">
+          <h3 className="text-base sm:text-lg font-semibold mb-2">No hackathons found</h3>
+          <p className="text-sm sm:text-base text-muted-foreground mb-4">
             No hackathons have been created on this network yet. Be the first to create one!
           </p>
-          <Button className="bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white">
+          <Button className="bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white w-full sm:w-auto">
             Create First Hackathon
           </Button>
         </div>
