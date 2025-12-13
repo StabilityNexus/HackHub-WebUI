@@ -1,5 +1,5 @@
 import '@rainbow-me/rainbowkit/styles.css'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 // import { ThemeProvider } from '@/components/theme-provider'
 import { WalletProvider } from '@/providers/WalletProvider'
@@ -9,6 +9,13 @@ export const metadata: Metadata = {
   title: 'HackHub - Decentralized Hackathon Platform',
   description: 'A modern platform for Web3 hackathons with project submission and judging capabilities',
   generator: 'Next.js',
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
 }
 
 export default function RootLayout({
@@ -27,7 +34,7 @@ export default function RootLayout({
             disableTransitionOnChange
           > */}
             <Navigation />
-            <main className="max-w-8xl mx-32 px-4 sm:px-6 lg:px-8 py-8">
+            <main className="max-w-8xl mx-auto px-4 sm:px-6 lg:mx-32 lg:px-8 py-4 sm:py-8">
               {children}
             </main>
           {/* </ThemeProvider> */}

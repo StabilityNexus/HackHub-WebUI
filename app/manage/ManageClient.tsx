@@ -577,7 +577,7 @@ export default function ManageHackathonPage() {
 
                     {/* Right: input + update button */}
                     {!hackathonInfo?.concluded && (
-                      <div className="flex flex-col items-end gap-2 min-w-[280px]">
+                      <div className="flex flex-col items-end gap-2 min-w-[200px] sm:min-w-[280px]">
                         <div className="flex items-center gap-3">
                           <Input
                             id={`tokens-${judge.address}`}
