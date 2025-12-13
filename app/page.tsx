@@ -219,7 +219,7 @@ export default function HomePage() {
               <div className="relative">            
                 {/* Main heading with enhanced styling */}
                 <div className="relative z-10 -mt-24 pb-8">
-                  <h1 className="text-6xl lg:text-7xl font-black leading-tight">
+                  <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-tight">
                     <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 drop-shadow-sm">
                       <DecryptedText 
                         text="Welcome to the On-Chain"
@@ -232,7 +232,7 @@ export default function HomePage() {
                         encryptedClassName="text-amber-400/40"
                       />
                     </span>
-                    <span className="block text-6xl lg:text-8xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-orange-600 to-amber-800 mt-4 tracking-tight">
+                    <span className="block text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-700 via-orange-600 to-amber-800 mt-4 tracking-tight">
                       <DecryptedText 
                         text="Hackathon Hub."
                         animateOn="view"
@@ -250,7 +250,7 @@ export default function HomePage() {
                    <div className="mt-6 w-24 h-1 bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-lg"></div>
                    
                    <div className="mt-8">
-                     <p className="text-xl lg:text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-600 tracking-wider">
+                     <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-amber-600 to-orange-600 tracking-wider">
                        <DecryptedText 
                          text="Transparent. Permissionless. Intuitive."
                          animateOn="view"
@@ -298,9 +298,9 @@ export default function HomePage() {
                 {/* Small decorative elements */}
                 
                 <div className="relative z-10 mt-">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                     <div>
-                      <h2 className="text-4xl lg:text-5xl font-black leading-tight">
+                      <h2 className="text-3xl sm:text-4xl lg:text-5xl font-black leading-tight">
                         <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700">
                           Think. Build. Innovate.
                         </span>
@@ -311,7 +311,7 @@ export default function HomePage() {
                     </div>
                     
                     {/* Sync Button */}
-                    <div className="flex flex-col items-end">
+                    <div className="flex flex-col items-start sm:items-end">
                       <Button
                         onClick={handleSync}
                         disabled={syncing || loading}
@@ -344,12 +344,12 @@ export default function HomePage() {
                         const statusBadge = getStatusBadge(status)
                         
                         return (
-                                                <div key={`${hackathon.contractAddress}-${index}`} className="flex-shrink-0 mx-4">
+                                                <div key={`${hackathon.contractAddress}-${index}`} className="flex-shrink-0 mx-2 sm:mx-4">
                         <Link 
                           href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}
                           className="block"
                         >
-                          <Card className="w-[350px] bg-white border border-gray-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer">
+                          <Card className="w-[280px] sm:w-[320px] md:w-[350px] bg-white border border-gray-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer">
                                 <CardContent className="p-5">
                                   <div className="space-y-3">
                                     {/* Header */}
