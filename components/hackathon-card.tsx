@@ -50,19 +50,19 @@ export default function HackathonCard({ hackathon, showJoinButton = true }: Hack
         </div>
       </div>
       
-      <CardContent className="p-6">
+      <CardContent className="p-4 sm:p-6">
         <div className="space-y-4">
           <div>
-            <h3 className="text-xl font-bold mb-2 text-amber-900">{hackathon.hackathonName}</h3>
+            <h3 className="text-lg sm:text-xl font-bold mb-2 text-amber-900">{hackathon.hackathonName}</h3>
             <p className="text-muted-foreground text-sm">{hackathon.description || "Web3 Hackathon"}</p>
           </div>
           
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-full bg-amber-100">
                 <Trophy className="w-4 h-4 text-amber-600" />
               </div>
-              <span className="font-semibold text-amber-700">{hackathon.prizePool} ETH</span>
+              <span className="font-semibold text-sm sm:text-base text-amber-700">{hackathon.prizePool} ETH</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-full bg-blue-100">
@@ -72,7 +72,7 @@ export default function HackathonCard({ hackathon, showJoinButton = true }: Hack
             </div>
           </div>
 
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
             <div className="flex items-center gap-2">
               <div className="p-1.5 rounded-full bg-green-100">
                 <Users className="w-4 h-4 text-green-600" />
@@ -95,7 +95,7 @@ export default function HackathonCard({ hackathon, showJoinButton = true }: Hack
             ))}
           </div>
           
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pt-2">
             <div className="flex items-center gap-2">
               <Avatar className="w-6 h-6">
                 <AvatarFallback className="text-xs bg-amber-100 text-amber-700">
@@ -108,10 +108,10 @@ export default function HackathonCard({ hackathon, showJoinButton = true }: Hack
             </div>
             
             {showJoinButton && (
-              <Link href={hackathonUrl}>
+              <Link href={hackathonUrl} className="w-full sm:w-auto">
                 <Button 
                   size="sm" 
-                  className="bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white shadow-sm hover:shadow-md transition-all"
+                  className="w-full sm:w-auto bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white shadow-sm hover:shadow-md transition-all"
                 >
                   View Details
                 </Button>

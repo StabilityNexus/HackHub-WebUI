@@ -463,29 +463,26 @@ function ExplorerPageContent() {
   return (
     <div className="space-y-8">
       <div className="text-center space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex-1"></div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+          <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
             Explore Hackathons
           </h1>
-          <div className="flex-1 flex justify-end">
-            <div className="flex flex-col items-end">
-              <Button
-                onClick={handleSync}
-                disabled={syncing || loading}
-                variant="outline"
-                size="sm"
-                className="border-amber-300 text-amber-700 hover:bg-amber-50 mb-2"
-              >
-                <RotateCcw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
-                {syncing ? 'Syncing...' : 'Sync'}
-              </Button>
-              {lastSyncTime && (
-                <span className="text-xs text-gray-500">
-                  Last synced: {lastSyncTime.toLocaleTimeString()}
-                </span>
-              )}
-            </div>
+          <div className="flex flex-col items-center sm:items-end">
+            <Button
+              onClick={handleSync}
+              disabled={syncing || loading}
+              variant="outline"
+              size="sm"
+              className="border-amber-300 text-amber-700 hover:bg-amber-50 mb-2"
+            >
+              <RotateCcw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing...' : 'Sync'}
+            </Button>
+            {lastSyncTime && (
+              <span className="text-xs text-gray-500">
+                Last synced: {lastSyncTime.toLocaleTimeString()}
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -520,7 +517,7 @@ function ExplorerPageContent() {
 
       {/* Results Info */}
       {effectiveTotal > 0 && (
-        <div className="flex items-center justify-between text-sm text-gray-600">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-sm text-gray-600">
           <span>
             Showing {startItem}-{endItem} of {effectiveTotal} hackathons
             {hasActiveFilters && ` (filtered from ${totalHackathons} total)`}

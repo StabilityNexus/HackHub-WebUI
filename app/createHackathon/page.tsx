@@ -295,24 +295,24 @@ export default function CreateHackathon() {
     <div className="min-h-screen p-4">
       <div className="max-w-4xl mx-auto py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
           <Button
             variant="outline"
-            
             onClick={() => router.push('/explorer')}
             className="flex items-center gap-2 border-amber-300 bg-white text-[#8B6914] hover:bg-[#FAE5C3] hover:text-gray-800 hover:border-none"
           >
             <ArrowLeft className="w-4 h-4 text-[#8B6914]" />
-            Back to Explorer
+            <span className="hidden sm:inline">Back to Explorer</span>
+            <span className="sm:hidden">Back</span>
           </Button>
           
-          <div className="text-center">
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
+          <div className="text-center flex-1">
+            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-amber-600 to-orange-500 bg-clip-text text-transparent">
               Create Hackathon
             </h1>
           </div>
           
-          <div className="w-32" /> {/* Spacer for centering */}
+          <div className="hidden sm:block w-32" /> {/* Spacer for centering */}
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -321,14 +321,14 @@ export default function CreateHackathon() {
             <CardContent className="space-y-6 pt-6">
               {/* Hackathon Name */}
               <div className="space-y-2">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 min-w-[200px]">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="flex items-center gap-2 w-full sm:min-w-[200px]">
                     <Sparkles className="w-4 h-4 text-[#8B6914]" />
                     <Label htmlFor="name" className="text-gray-700 font-medium">Hackathon Name *</Label>
                     <button
                       type="button"
                       onClick={() => toggleInfo('name')}
-                      className="text-amber-600 hover:text-amber-700"
+                      className="text-amber-600 hover:text-amber-700 ml-auto sm:ml-0"
                     >
                       <Info className="w-4 h-4 text-[#8B6914]" />
                     </button>
@@ -338,11 +338,11 @@ export default function CreateHackathon() {
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     placeholder="Enter hackathon name"
-                    className="border-amber-200 focus:border-amber-500 bg-white text-gray-900 placeholder:text-gray-500 flex-1"
+                    className="border-amber-200 focus:border-amber-500 bg-white text-gray-900 placeholder:text-gray-500 flex-1 w-full"
                   />
                 </div>
                 {showInfo.name && (
-                  <p className="text-sm text-gray-600 ml-[212px]">
+                  <p className="text-sm text-gray-600 sm:ml-[212px]">
                     Choose a unique and descriptive name for your hackathon
                   </p>
                 )}
@@ -353,28 +353,28 @@ export default function CreateHackathon() {
               {/* Date and Time */}
               <div className="space-y-4">
                 {/* Timezone Toggle */}
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 min-w-[200px]">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="flex items-center gap-2 w-full sm:min-w-[200px]">
                     <Globe className="w-4 h-4 text-[#8B6914]" />
                     <Label className="text-gray-700 font-medium">Timezone</Label>
                     <button
                       type="button"
                       onClick={() => toggleInfo('timezone')}
-                      className="text-amber-600 hover:text-amber-700"
+                      className="text-amber-600 hover:text-amber-700 ml-auto sm:ml-0"
                     >
                       <Info className="w-4 h-4 text-[#8B6914]" />
                     </button>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
                     <Button
                       type="button"
                       variant={timezoneMode === 'local' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setTimezoneMode('local')}
-                      className={timezoneMode === 'local' 
+                      className={`flex-1 sm:flex-initial ${timezoneMode === 'local' 
                         ? 'bg-[#8B6914] text-white hover:bg-[#8B6914] hover:bg-[#FAE5C3] hover:text-[#8B6914] border-none'
                         : 'bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white border-none'
-                      }
+                      }`}
                     >
                       Local Time
                     </Button>
@@ -383,17 +383,17 @@ export default function CreateHackathon() {
                       variant={timezoneMode === 'utc' ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setTimezoneMode('utc')}
-                      className={timezoneMode === 'utc' 
+                      className={`flex-1 sm:flex-initial ${timezoneMode === 'utc' 
                         ? 'bg-[#8B6914] text-white hover:bg-[#8B6914] hover:bg-[#FAE5C3] hover:text-[#8B6914] border-none'
                         : 'bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white border-none'
-                      }
+                      }`}
                     >
                       UTC
                     </Button>
                   </div>
                 </div>
                 {showInfo.timezone && (
-                  <p className="text-sm text-gray-600 mb-4 ml-[212px]">
+                  <p className="text-sm text-gray-600 mb-4 sm:ml-[212px]">
                     Choose how you want to input times. Local time will be converted to UTC for storage on the blockchain.
                     All times are ultimately stoamber and displayed in UTC format.
                   </p>
@@ -458,14 +458,14 @@ export default function CreateHackathon() {
 
               {/* Image URL */}
               <div className="space-y-2">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 min-w-[200px]">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                  <div className="flex items-center gap-2 w-full sm:min-w-[200px]">
                     <Globe className="w-4 h-4 text-[#8B6914]" />
                     <Label htmlFor="imageURL" className="text-gray-700 font-medium">Image URL (Optional)</Label>
                     <button
                       type="button"
                       onClick={() => toggleInfo('imageURL')}
-                      className="text-amber-600 hover:text-amber-700"
+                      className="text-amber-600 hover:text-amber-700 ml-auto sm:ml-0"
                     >
                       <Info className="w-4 h-4 text-[#8B6914]" />
                     </button>
@@ -475,11 +475,11 @@ export default function CreateHackathon() {
                     value={formData.imageURL}
                     onChange={(e) => setFormData({ ...formData, imageURL: e.target.value })}
                     placeholder="https://example.com/image.png"
-                    className="border-amber-200 focus:border-amber-500 bg-white text-gray-900 placeholder:text-gray-500 flex-1"
+                    className="border-amber-200 focus:border-amber-500 bg-white text-gray-900 placeholder:text-gray-500 flex-1 w-full"
                   />
                 </div>
                 {showInfo.imageURL && (
-                  <p className="text-sm text-gray-600 ml-[212px]">
+                  <p className="text-sm text-gray-600 sm:ml-[212px]">
                     Optional URL for hackathon banner image. Leave empty to use default blockchain block image.
                   </p>
                 )}
@@ -703,7 +703,7 @@ export default function CreateHackathon() {
               type="submit"
               size="lg"
                 disabled={isLoading}
-              className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white px-12 py-3 shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-[#FAE5C3] text-[#8B6914] hover:bg-[#8B6914] hover:text-white px-6 sm:px-12 py-3 shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto"
             >
               {isLoading ? (
                 <>
