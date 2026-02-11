@@ -290,17 +290,17 @@ export default function HomePage() {
       </div>
 
       {/* Revolution Section with Hackathons Carousel */}
-      <div className="min-h-screen py-16">
-        <div className="container mx-auto">
+      <div className="min-h-screen py-8 sm:py-16">
+        <div className="container mx-auto px-4 sm:px-6">
           <div className="space-y-8">
               {/* Revolution Text - Moved Higher */}
               <div className="relative -mt-8">
                 {/* Small decorative elements */}
                 
                 <div className="relative z-10 mt-">
-                  <div className="flex items-center justify-between">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
                     <div>
-                      <h2 className="text-4xl lg:text-5xl font-black leading-tight">
+                      <h2 className="text-2xl sm:text-4xl lg:text-5xl font-black leading-tight">
                         <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700">
                           Think. Build. Innovate.
                         </span>
@@ -311,13 +311,13 @@ export default function HomePage() {
                     </div>
                     
                     {/* Sync Button */}
-                    <div className="flex flex-col items-end">
+                    <div className="flex flex-col items-start sm:items-end w-full sm:w-auto">
                       <Button
                         onClick={handleSync}
                         disabled={syncing || loading}
                         variant="outline"
                         size="sm"
-                        className="border-amber-300 text-amber-700 hover:bg-amber-50 mb-2"
+                        className="border-amber-300 text-amber-700 hover:bg-amber-50 mb-2 w-full sm:w-auto">
                       >
                         <RefreshCw className={`w-4 h-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
                         {syncing ? 'Syncing...' : 'Sync'}
@@ -334,7 +334,7 @@ export default function HomePage() {
               
               {/* Circular Hackathons Carousel - Right Side */}
               {!loading && !error && recentHackathons.length > 0 && (
-                <div className="overflow-hidden h-[50vh]">
+                <div className="overflow-hidden h-[40vh] sm:h-[50vh]">
                   <div className="relative h-full flex items-center">
                     {/* Infinite scrolling container */}
                     <div className="flex animate-scroll-left">
@@ -344,12 +344,12 @@ export default function HomePage() {
                         const statusBadge = getStatusBadge(status)
                         
                         return (
-                                                <div key={`${hackathon.contractAddress}-${index}`} className="flex-shrink-0 mx-4">
+                                                <div key={`${hackathon.contractAddress}-${index}`} className="flex-shrink-0 mx-2 sm:mx-4">
                         <Link 
                           href={`/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`}
                           className="block"
                         >
-                          <Card className="w-[350px] bg-white border border-gray-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer">
+                          <Card className="w-[280px] sm:w-[350px] bg-white border border-gray-200 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-2 cursor-pointer">
                                 <CardContent className="p-5">
                                   <div className="space-y-3">
                                     {/* Header */}
@@ -398,15 +398,15 @@ export default function HomePage() {
               
               {/* Loading State - Right Side */}
               {loading && (
-                <div className="flex justify-center items-center h-[50vh]">
+                <div className="flex justify-center items-center h-[40vh] sm:h-[50vh]">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-amber-300"></div>
                 </div>
               )}
               
               {/* Error State - Right Side */}
               {error && (
-                <div className="flex items-center justify-center h-[50vh]">
-                  <div className="bg-red-50/80 rounded-lg p-6 max-w-md">
+                <div className="flex items-center justify-center h-[40vh] sm:h-[50vh]">
+                  <div className="bg-red-50/80 rounded-lg p-4 sm:p-6 max-w-md mx-4">
                     <p className="font-medium text-red-600">{error}</p>
                     <Button 
                       onClick={() => loadRecentHackathons(true)} 
@@ -421,11 +421,11 @@ export default function HomePage() {
               
               {/* Empty State - Right Side */}
               {!loading && !error && recentHackathons.length === 0 && (
-                <div className="flex items-center justify-center h-[50vh]">
-                  <div className="bg-white/50 rounded-lg p-8 max-w-md text-center">
-                    <Zap className="w-16 h-16 text-amber-500 mx-auto mb-4" />
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">No hackathons found</h3>
-                    <p className="text-muted-foreground mb-4">Be the first to create an exciting hackathon!</p>
+                <div className="flex items-center justify-center h-[40vh] sm:h-[50vh]">
+                  <div className="bg-white/50 rounded-lg p-6 sm:p-8 max-w-md text-center mx-4">
+                    <Zap className="w-12 h-12 sm:w-16 sm:h-16 text-amber-500 mx-auto mb-4" />
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">No hackathons found</h3>
+                    <p className="text-muted-foreground text-sm sm:text-base mb-4">Be the first to create an exciting hackathon!</p>
                     <Link href="/createHackathon">
                       <Button className="bg-amber-600 hover:bg-amber-700">
                         <Plus className="w-4 h-4 mr-2" />
