@@ -211,14 +211,14 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* Hero Section - Full Viewport Height */}
-      <div className="min-h-screen flex items-center justify-center relative">
+      <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center relative">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             {/* Left side - Welcome to HackHub */}
             <div className="space-y-6">
               <div className="relative">            
                 {/* Main heading with enhanced styling */}
-                <div className="relative z-10 -mt-24 pb-8">
+                <div className="relative z-10 pb-8">
                   <h1 className="text-6xl lg:text-7xl font-black leading-tight">
                     <span className="block text-transparent bg-clip-text bg-gradient-to-r from-amber-600 via-orange-500 to-amber-700 drop-shadow-sm">
                       <DecryptedText 
