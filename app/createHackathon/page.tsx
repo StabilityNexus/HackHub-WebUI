@@ -322,7 +322,7 @@ export default function CreateHackathon() {
               {/* Hackathon Name */}
               <div className="space-y-2">
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 min-w-[200px]">
+                  <div className="flex items-center gap-2 sm:min-w-[200px]">
                     <Sparkles className="w-4 h-4 text-[#8B6914]" />
                     <Label htmlFor="name" className="text-gray-700 font-medium">Hackathon Name *</Label>
                     <button
@@ -354,7 +354,7 @@ export default function CreateHackathon() {
               <div className="space-y-4">
                 {/* Timezone Toggle */}
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 min-w-[200px]">
+                  <div className="flex items-center gap-2 sm:min-w-[200px]">
                     <Globe className="w-4 h-4 text-[#8B6914]" />
                     <Label className="text-gray-700 font-medium">Timezone</Label>
                     <button
@@ -459,7 +459,7 @@ export default function CreateHackathon() {
               {/* Image URL */}
               <div className="space-y-2">
                 <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 min-w-[200px]">
+                  <div className="flex items-center gap-2 sm:min-w-[200px]">
                     <Globe className="w-4 h-4 text-[#8B6914]" />
                     <Label htmlFor="imageURL" className="text-gray-700 font-medium">Image URL (Optional)</Label>
                     <button

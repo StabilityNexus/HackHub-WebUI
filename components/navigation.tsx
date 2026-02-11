@@ -16,10 +16,10 @@ export default function Navigation() {
 
   return (
     <header className="border-b border-amber-100/60 bg-white/95 backdrop-blur-md sticky top-0 z-50 shadow-sm">
-      <div className="px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-3 hover:opacity-80 transition-opacity">
-            <div className="w-12 h-12 flex items-center justify-center">
+      <div className="px-3 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-14 sm:h-16">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 hover:opacity-80 transition-opacity">
+            <div className="w-8 h-8 sm:w-12 sm:h-12 flex items-center justify-center">
               <img 
                 src={getImagePath("/block.png")} 
                 alt="HackHub Logo" 
@@ -28,7 +28,7 @@ export default function Navigation() {
                 className="object-contain"
               />
             </div>
-            <span className="font-bold text-3xl bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
+            <span className="font-bold text-xl sm:text-3xl bg-gradient-to-r from-amber-700 to-orange-600 bg-clip-text text-transparent">
               HackHub
             </span>
           </Link>

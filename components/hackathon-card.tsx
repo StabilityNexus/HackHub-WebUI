@@ -43,18 +43,18 @@ export default function HackathonCard({ hackathon, showJoinButton = true }: Hack
         <img 
           src={hackathon.image || "/placeholder.svg?height=200&width=400"} 
           alt={hackathon.hackathonName}
-          className="w-full h-48 object-cover rounded-t-lg"
+          className="w-full h-36 sm:h-48 object-cover rounded-t-lg"
         />
         <div className="absolute top-4 right-4">
           {getStatusBadge()}
         </div>
       </div>
       
-      <CardContent className="p-6">
-        <div className="space-y-4">
+      <CardContent className="p-4 sm:p-6">
+        <div className="space-y-3 sm:space-y-4">
           <div>
-            <h3 className="text-xl font-bold mb-2 text-amber-900">{hackathon.hackathonName}</h3>
-            <p className="text-muted-foreground text-sm">{hackathon.description || "Web3 Hackathon"}</p>
+            <h3 className="text-lg sm:text-xl font-bold mb-2 text-amber-900">{hackathon.hackathonName}</h3>
+            <p className="text-muted-foreground text-xs sm:text-sm">{hackathon.description || "Web3 Hackathon"}</p>
           </div>
           
           <div className="flex items-center justify-between">
