@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Trophy, Users, Clock, Vote, Gavel } from "lucide-react"
+import { Trophy, Users, Vote, Gavel, Star } from "lucide-react"
 import { HackathonData, getDaysRemaining, getHackathonStatus } from "@/hooks/useHackathons"
 import { useChainId } from "wagmi"
 
@@ -14,112 +14,150 @@ interface HackathonCardProps {
   showJoinButton?: boolean
 }
 
-export default function HackathonCard({ hackathon, showJoinButton = true }: HackathonCardProps) {
-  const status = getHackathonStatus(hackathon.startTime, hackathon.endTime, hackathon.concluded)
-  const daysRemaining = getDaysRemaining(hackathon.endTime)
+export default function HackathonCard({
+  hackathon,
+  showJoinButton = true,
+}: HackathonCardProps) {
+  const status = getHackathonStatus(
+    hackathon.startTime,
+    hackathon.endTime,
+    hackathon.concluded
+  )
   const chainId = useChainId()
-  
+
+  const hackathonUrl = `/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`
+
   const getStatusBadge = () => {
+    const base = "text-white shadow-sm text-xs sm:text-sm"
     switch (status) {
-      case 'upcoming':
-        return <Badge className="bg-blue-500 hover:bg-blue-600 text-white shadow-sm">Upcoming</Badge>
-      case 'accepting-submissions':
-        return <Badge className="bg-green-500 hover:bg-green-600 text-white shadow-sm">Accepting Submissions</Badge>
-      case 'judging-submissions':
-        return <Badge className="bg-orange-500 hover:bg-orange-600 text-white shadow-sm">Judging Submissions</Badge>
-      case 'concluded':
-        return <Badge className="bg-slate-500 hover:bg-slate-600 text-white shadow-sm">Concluded</Badge>
+      case "upcoming":
+        return <Badge className={`${base} bg-blue-500`}>Upcoming</Badge>
+      case "accepting-submissions":
+        return <Badge className={`${base} bg-green-500`}>Accepting Submissions</Badge>
+      case "judging-submissions":
+        return <Badge className={`${base} bg-orange-500`}>Judging Submissions</Badge>
+      case "concluded":
+        return <Badge className={`${base} bg-slate-500`}>Concluded</Badge>
       default:
-        return <Badge className="bg-slate-500 hover:bg-slate-600 text-white shadow-sm">Unknown</Badge>
+        return <Badge className={`${base} bg-slate-500`}>Unknown</Badge>
     }
   }
 
-  // Create the URL with hackAddr and chainId parameters
-  const hackathonUrl = `/h?hackAddr=${hackathon.contractAddress}&chainId=${chainId}`
-
   return (
-    <Card className="border-0 shadow-md hover:shadow-lg transition-all hover:scale-[1.02] cursor-pointer bg-white/80 backdrop-blur-sm">
+    <Card
+      className="
+        relative
+        flex
+        h-full
+        flex-col
+        overflow-hidden
+        border
+        border-border
+        bg-card
+        shadow-sm
+        transition
+        md:hover:shadow-lg
+        md:hover:-translate-y-1
+      "
+    >
+      {/* Image */}
       <div className="relative">
-        <img 
-          src={hackathon.image || "/placeholder.svg?height=200&width=400"} 
+        <img
+          src={hackathon.image || "/placeholder.svg"}
           alt={hackathon.hackathonName}
-          className="w-full h-48 object-cover rounded-t-lg"
+          className="h-40 w-full object-cover sm:h-48"
         />
-        <div className="absolute top-4 right-4">
+
+        <div className="absolute right-3 top-3 flex items-center gap-2">
+          {hackathon.featured && (
+            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+          )}
           {getStatusBadge()}
         </div>
       </div>
-      
-      <CardContent className="p-6">
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-xl font-bold mb-2 text-amber-900">{hackathon.hackathonName}</h3>
-            <p className="text-muted-foreground text-sm">{hackathon.description || "Web3 Hackathon"}</p>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-full bg-amber-100">
-                <Trophy className="w-4 h-4 text-amber-600" />
-              </div>
-              <span className="font-semibold text-amber-700">{hackathon.prizePool} ETH</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-full bg-blue-100">
-                <Gavel className="w-4 h-4 text-blue-600" />
-              </div>
-              <span className="text-sm text-muted-foreground">{hackathon.judgeCount} judges</span>
-            </div>
+
+      {/* Content */}
+      <CardContent className="flex flex-grow flex-col gap-4 p-4 sm:p-6">
+        {/* Title */}
+        <div>
+          <h3 className="text-lg font-bold sm:text-xl text-foreground">
+            {hackathon.hackathonName}
+          </h3>
+          <p className="mt-1 text-sm text-muted-foreground line-clamp-2">
+            {hackathon.description || "Web3 Hackathon"}
+          </p>
+        </div>
+
+        {/* Stats */}
+        <div className="flex flex-col gap-3 text-sm sm:flex-row sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Trophy className="h-4 w-4 text-amber-600" />
+            <span className="font-medium">
+              {hackathon.prizePool} ETH
+            </span>
           </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-full bg-green-100">
-                <Users className="w-4 h-4 text-green-600" />
-              </div>
-              <span className="text-sm text-muted-foreground">{hackathon.projectCount} projects</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="p-1.5 rounded-full bg-orange-100">
-                <Vote className="w-4 h-4 text-orange-600" />
-              </div>
-              <span className="text-sm text-muted-foreground">{hackathon.totalTokens} voting tokens</span>
-            </div>
+          <div className="flex items-center gap-2">
+            <Gavel className="h-4 w-4 text-blue-600" />
+            <span className="text-muted-foreground">
+              {hackathon.judgeCount} judges
+            </span>
           </div>
-          
+        </div>
+
+        <div className="flex flex-col gap-3 text-sm sm:flex-row sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Users className="h-4 w-4 text-green-600" />
+            <span className="text-muted-foreground">
+              {hackathon.projectCount} projects
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Vote className="h-4 w-4 text-orange-600" />
+            <span className="text-muted-foreground">
+              {hackathon.totalTokens} voting tokens
+            </span>
+          </div>
+        </div>
+
+        {/* Tags */}
+        {hackathon.tags?.length > 0 && (
           <div className="flex flex-wrap gap-2">
-            {(hackathon.tags || []).map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs bg-amber-50 text-amber-700 hover:bg-amber-100">
+            {hackathon.tags.map((tag) => (
+              <Badge
+                key={tag}
+                variant="secondary"
+                className="text-xs"
+              >
                 {tag}
               </Badge>
             ))}
           </div>
-          
-          <div className="flex items-center justify-between pt-2">
-            <div className="flex items-center gap-2">
-              <Avatar className="w-6 h-6">
-                <AvatarFallback className="text-xs bg-amber-100 text-amber-700">
-                  {hackathon.organizer.slice(2, 4).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm text-muted-foreground">
-                {hackathon.organizer.slice(0, 6)}...{hackathon.organizer.slice(-4)}
-              </span>
-            </div>
-            
-            {showJoinButton && (
-              <Link href={hackathonUrl}>
-                <Button 
-                  size="sm" 
-                  className="bg-gradient-to-r from-amber-600 to-orange-500 hover:from-amber-700 hover:to-orange-600 text-white shadow-sm hover:shadow-md transition-all"
-                >
-                  View Details
-                </Button>
-              </Link>
-            )}
+        )}
+
+        {/* Footer */}
+        <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2 text-sm">
+            <Avatar className="h-6 w-6">
+              <AvatarFallback className="text-xs">
+                {hackathon.organizer.slice(2, 4).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-muted-foreground">
+              {hackathon.organizer.slice(0, 6)}…{hackathon.organizer.slice(-4)}
+            </span>
           </div>
+
+          {showJoinButton && (
+            <Link href={hackathonUrl} className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto">
+                View Details
+              </Button>
+            </Link>
+          )}
         </div>
       </CardContent>
     </Card>
   )
-} 
+}
